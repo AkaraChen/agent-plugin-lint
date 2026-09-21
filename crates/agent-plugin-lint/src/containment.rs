@@ -443,6 +443,11 @@ mod tests {
         let file = temp.path().join("file");
         fs::write(&file, "one").unwrap();
         let original = fs::metadata(&file).unwrap();
+        #[cfg(windows)]
+        let before_identity = {
+            let handle = File::open(&file).unwrap();
+            identity(&handle, &original).unwrap()
+        };
         let copy = file.clone();
         let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::AfterRead) {
@@ -453,12 +458,27 @@ mod tests {
                 let current = fs::metadata(&copy).unwrap();
                 assert_eq!(current.len(), original.len());
                 assert_eq!(current.modified().unwrap(), original.modified().unwrap());
+                #[cfg(windows)]
+                {
+                    let handle = File::open(&copy).unwrap();
+                    let restored_identity = identity(&handle, &current).unwrap();
+                    eprintln!(
+                        "in-place safe-read diagnostic: before_identity={before_identity:?}; \
+                         restored_identity={restored_identity:?}; before_len={}; restored_len={}; \
+                         before_modified={:?}; restored_modified={:?}",
+                        original.len(),
+                        current.len(),
+                        original.modified().ok(),
+                        current.modified().ok(),
+                    );
+                }
             }
         });
-        assert!(matches!(
-            read_safe(temp.path(), &file),
-            Err(ReadError::InputChanged)
-        ));
+        let result = read_safe(temp.path(), &file);
+        assert!(
+            matches!(result, Err(ReadError::InputChanged)),
+            "expected InputChanged after same-length in-place rewrite with restored mtime; actual result: {result:?}"
+        );
     }
     #[cfg(windows)]
     #[test]
