@@ -315,6 +315,17 @@ mod tests {
         TEST_HOOK.with(|hook| *hook.borrow_mut() = Some(Box::new(f)));
         HookGuard
     }
+    #[cfg(unix)]
+    fn complete_within<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> T {
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        std::thread::spawn(move || {
+            let result = work();
+            let _ = sender.send(result);
+        });
+        receiver
+            .recv_timeout(std::time::Duration::from_secs(2))
+            .expect("FIFO read exceeded the watchdog deadline")
+    }
     #[test]
     fn detects_replaced_path_and_changed_contents() {
         let _serial = unpoisoned_lock(&TEST_SERIAL);
@@ -380,35 +391,63 @@ mod tests {
             .unwrap();
     }
     #[test]
-    fn detects_same_length_changes_with_restored_mtime() {
+    fn detects_before_open_replacement_with_same_length_and_restored_mtime() {
         let _serial = unpoisoned_lock(&TEST_SERIAL);
         let temp = TempDir::new().unwrap();
         let file = temp.path().join("file");
         fs::write(&file, "one").unwrap();
         let original = fs::metadata(&file).unwrap();
         let copy = file.clone();
-        {
-            let _hook = with_hook(move |point| {
-                if matches!(point, HookPoint::BeforeOpen) {
-                    fs::remove_file(&copy).unwrap();
-                    fs::write(&copy, "two").unwrap();
-                    restore_mtime(&copy, &original);
-                    let current = fs::metadata(&copy).unwrap();
-                    assert_eq!(current.len(), original.len());
-                    assert_eq!(current.modified().unwrap(), original.modified().unwrap());
-                }
-            });
-            assert!(matches!(
-                read_safe(temp.path(), &file),
-                Err(ReadError::InputChanged)
-            ));
-        }
+        let _hook = with_hook(move |point| {
+            if matches!(point, HookPoint::BeforeOpen) {
+                fs::remove_file(&copy).unwrap();
+                fs::write(&copy, "two").unwrap();
+                restore_mtime(&copy, &original);
+                let current = fs::metadata(&copy).unwrap();
+                assert_eq!(current.len(), original.len());
+                assert_eq!(current.modified().unwrap(), original.modified().unwrap());
+            }
+        });
+        assert!(matches!(
+            read_safe(temp.path(), &file),
+            Err(ReadError::InputChanged)
+        ));
+    }
+    #[test]
+    fn detects_after_read_replacement_with_same_length_and_restored_mtime() {
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let file = temp.path().join("file");
         fs::write(&file, "one").unwrap();
         let original = fs::metadata(&file).unwrap();
         let copy = file.clone();
         let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::AfterRead) {
                 fs::remove_file(&copy).unwrap();
+                fs::write(&copy, "two").unwrap();
+                restore_mtime(&copy, &original);
+                let current = fs::metadata(&copy).unwrap();
+                assert_eq!(current.len(), original.len());
+                assert_eq!(current.modified().unwrap(), original.modified().unwrap());
+            }
+        });
+        assert!(matches!(
+            read_safe(temp.path(), &file),
+            Err(ReadError::InputChanged)
+        ));
+    }
+    #[test]
+    fn detects_after_read_in_place_change_with_same_length_and_restored_mtime() {
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let file = temp.path().join("file");
+        fs::write(&file, "one").unwrap();
+        let original = fs::metadata(&file).unwrap();
+        let copy = file.clone();
+        let _hook = with_hook(move |point| {
+            if matches!(point, HookPoint::AfterRead) {
+                // Do not replace the directory entry: this must exercise
+                // Unix ctime / Windows ChangeTime on the same file identity.
                 fs::write(&copy, "two").unwrap();
                 restore_mtime(&copy, &original);
                 let current = fs::metadata(&copy).unwrap();
@@ -518,8 +557,9 @@ mod tests {
                 .success()
         );
         assert!(fs::symlink_metadata(&fifo).unwrap().file_type().is_fifo());
+        let root = temp.path().to_path_buf();
         assert!(matches!(
-            read_safe(temp.path(), &fifo),
+            complete_within(move || read_safe(&root, &fifo)),
             Err(ReadError::Unsafe)
         ));
     }
@@ -530,26 +570,29 @@ mod tests {
         let temp = TempDir::new().unwrap();
         let file = temp.path().join("file");
         fs::write(&file, "ordinary").unwrap();
-        let copy = file.clone();
+        let root = temp.path().to_path_buf();
         let opened = Arc::new(AtomicBool::new(false));
         let opened_copy = opened.clone();
-        let _hook = with_hook(move |point| {
-            if matches!(point, HookPoint::BeforeOpen) {
-                fs::remove_file(&copy).unwrap();
-                assert!(
-                    std::process::Command::new("mkfifo")
-                        .arg(&copy)
-                        .status()
-                        .unwrap()
-                        .success()
-                );
-            }
-            if matches!(point, HookPoint::AfterOpen) {
-                opened_copy.store(true, Ordering::SeqCst);
-            }
-        });
         assert!(matches!(
-            read_safe(temp.path(), &file),
+            complete_within(move || {
+                let copy = file.clone();
+                let _hook = with_hook(move |point| {
+                    if matches!(point, HookPoint::BeforeOpen) {
+                        fs::remove_file(&copy).unwrap();
+                        assert!(
+                            std::process::Command::new("mkfifo")
+                                .arg(&copy)
+                                .status()
+                                .unwrap()
+                                .success()
+                        );
+                    }
+                    if matches!(point, HookPoint::AfterOpen) {
+                        opened_copy.store(true, Ordering::SeqCst);
+                    }
+                });
+                read_safe(&root, &file)
+            }),
             Err(ReadError::InputChanged)
         ));
         assert!(opened.load(Ordering::SeqCst));

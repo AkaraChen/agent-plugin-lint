@@ -149,13 +149,7 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                                 "SAFE_READ_UNSUPPORTED",
                                 "当前平台无法安全读取 mcp.json 内容",
                             );
-                            coverage(
-                                plugin,
-                                RuleId::McpEnvelope,
-                                "mcp.json",
-                                CoverageStatus::Unchecked,
-                                "SAFE_READ_UNSUPPORTED",
-                            );
+                            safe_read_unsupported_block(plugin);
                         }
                         Err(ReadError::Io(_)) => {
                             error(errors, &path, "MCP_READ", "无法读取 mcp.json 内容");
@@ -175,19 +169,27 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
 }
 
 fn representation_block(plugin: &mut PluginReport) {
+    blocked_unread_envelope(plugin, "JSON_REPRESENTATION");
+}
+
+fn safe_read_unsupported_block(plugin: &mut PluginReport) {
+    blocked_unread_envelope(plugin, "SAFE_READ_UNSUPPORTED");
+}
+
+fn blocked_unread_envelope(plugin: &mut PluginReport, reason: &str) {
     coverage(
         plugin,
         RuleId::McpEnvelope,
         "mcp.json",
         CoverageStatus::Unchecked,
-        "JSON_REPRESENTATION",
+        reason,
     );
     coverage(
         plugin,
         RuleId::AdviceDuplicateJsonKey,
         "mcp.json",
         CoverageStatus::Unchecked,
-        "JSON_REPRESENTATION",
+        reason,
     );
     for rule in [
         RuleId::McpSchemaId,
@@ -201,13 +203,7 @@ fn representation_block(plugin: &mut PluginReport) {
         RuleId::McpHeaders,
         RuleId::McpReservedEnv,
     ] {
-        coverage(
-            plugin,
-            rule,
-            "mcp.json",
-            CoverageStatus::Blocked,
-            "JSON_REPRESENTATION",
-        );
+        coverage(plugin, rule, "mcp.json", CoverageStatus::Blocked, reason);
     }
 }
 

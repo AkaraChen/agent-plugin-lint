@@ -149,12 +149,16 @@ fn mcp_duplicate_keys_and_unrepresentable_number_are_not_misreported_as_invalid_
             .iter()
             .any(|e| e.code == "MCP_JSON_REPRESENTATION")
     );
-    assert!(
-        report.plugins[0]
-            .coverage
-            .iter()
-            .any(|c| c.rule_id == "AP-MCP-ENVELOPE" && c.status == CoverageStatus::Unchecked)
-    );
+    assert!(report.plugins[0].coverage.iter().any(|c| {
+        c.rule_id == "AP-MCP-ENVELOPE"
+            && c.status == CoverageStatus::Unchecked
+            && c.reason_code.as_deref() == Some("JSON_REPRESENTATION")
+    }));
+    assert!(report.plugins[0].coverage.iter().any(|c| {
+        c.rule_id == "AP-ADVICE-DUPLICATE-JSON-KEY"
+            && c.status == CoverageStatus::Unchecked
+            && c.reason_code.as_deref() == Some("JSON_REPRESENTATION")
+    }));
     assert!(
         report.plugins[0]
             .coverage

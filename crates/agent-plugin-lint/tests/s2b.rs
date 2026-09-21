@@ -26,6 +26,18 @@ fn options(mode: InputMode) -> LintOptions {
 }
 
 #[cfg(unix)]
+fn complete_within<T: Send + 'static>(work: impl FnOnce() -> T + Send + 'static) -> T {
+    let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+    std::thread::spawn(move || {
+        let result = work();
+        let _ = sender.send(result);
+    });
+    receiver
+        .recv_timeout(std::time::Duration::from_secs(2))
+        .expect("FIFO lint exceeded the watchdog deadline")
+}
+
+#[cfg(unix)]
 fn non_utf8_component() -> std::ffi::OsString {
     use std::os::unix::ffi::OsStringExt;
     std::ffi::OsString::from_vec(b"bad\xFF".to_vec())
@@ -377,7 +389,8 @@ fn external_links_and_fifos_are_never_read_as_manifests() {
             .unwrap()
             .success()
     );
-    let report = lint_path(fifo.path(), options(InputMode::Plugin));
+    let fifo_root = fifo.path().to_path_buf();
+    let report = complete_within(move || lint_path(&fifo_root, options(InputMode::Plugin)));
     assert_eq!(report.exit_code, 1);
     assert!(
         report.plugins[0]
