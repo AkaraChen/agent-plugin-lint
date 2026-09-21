@@ -224,9 +224,9 @@ AP §7.1 将格式要求交给 Agent Skills。本轮冻结 research/agent-skills
 |---|---|---|---|
 | AS-* | agent-skills-lint / parser、validator、diagnostic | SkillRule + SkillIssueKind + SkillReport；计数为 chars().count() | S1 |
 | AP-MANIFEST-*、AP-NAME-*、AP-VERSION-* | agent-plugin-lint / manifest、report、vendor | RuleId + Finding；两非 fatal 例外先投影 | S2 |
-| AP-DISCOVERY-*、AP-PATH-*、AP-SKILL-* | agent-plugin-lint / discovery、containment、skills | ResolvedRoot、PathRole、Containment；Scope/Effect 最窄隔离 | S3 |
+| AP-DISCOVERY-*、AP-PATH-*、AP-SKILL-* | agent-plugin-lint / lint、containment、skills | Resolution、ReadError；Scope/Effect 最窄隔离 | S3 |
 | AP-MCP-*、AP-EXPANSION-* | agent-plugin-lint / mcp、expansion | envelope 与 server 分开；未知数据根 Runtime | S4 |
-| AP-EXTENSION-*、AP-EXTENSIONS-* | agent-plugin-lint / extensions | 未实现 namespace 不读 value；不强制数据/目录成对 | S5 |
+| AP-EXTENSION-*、AP-EXTENSIONS-* | agent-plugin-lint / manifest | 未实现 namespace 不读 value；不强制数据/目录成对 | S5 |
 | AP-CLIENT-*、AP-RELEASE-*、人工规则 | report / coverage 与开发测试 | 适用的模拟契约写测试，其余 Manual/Runtime；不伪报通过 | 各片 |
 
 91 条 ID 保持不变。代码元数据测试应核对 ID 与表的映射；每条具体规则的执行状态在 coverage 或验证记录中呈现。默认政策 D4 暂按确定 normative MUST 包违规返回 1（含 ignored）；D3/D5/D6 保守未检查；待决身份不改变。

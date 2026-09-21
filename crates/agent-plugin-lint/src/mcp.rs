@@ -69,73 +69,91 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                         "MCP_METADATA_IO",
                     );
                 }
-                Ok(true) => match containment::read_safe(root, &path) {
-                    Ok(source) => match json::parse(&source) {
-                        Parsed::Value {
-                            value,
-                            duplicate_keys,
-                        } => {
-                            duplicate_coverage(plugin, duplicate_keys);
-                            envelope(root, plugin, errors, value)
-                        }
-                        Parsed::Syntax => disable(
-                            plugin,
-                            RuleId::McpEnvelope,
-                            None,
-                            "MCP_JSON",
-                            "mcp.json 不是有效 JSON，已禁用 MCP 组件",
-                        ),
-                        Parsed::Representation => {
+                Ok(true) => {
+                    // These are fixed-location checks.  A valid file remains
+                    // contained even if its JSON envelope is later rejected.
+                    coverage(
+                        plugin,
+                        RuleId::DiscoveryKind,
+                        "mcp.json",
+                        CoverageStatus::Pass,
+                        "MCP_REGULAR_FILE",
+                    );
+                    coverage(
+                        plugin,
+                        RuleId::PathFixedEscape,
+                        "mcp.json",
+                        CoverageStatus::Pass,
+                        "MCP_FIXED_FILE_CONTAINED",
+                    );
+                    match containment::read_safe(root, &path) {
+                        Ok(source) => match json::parse(&source) {
+                            Parsed::Value {
+                                value,
+                                duplicate_keys,
+                            } => {
+                                duplicate_coverage(plugin, duplicate_keys);
+                                envelope(root, plugin, errors, value)
+                            }
+                            Parsed::Syntax => disable(
+                                plugin,
+                                RuleId::McpEnvelope,
+                                None,
+                                "MCP_JSON",
+                                "mcp.json 不是有效 JSON，已禁用 MCP 组件",
+                            ),
+                            Parsed::Representation => {
+                                error(
+                                    errors,
+                                    &path,
+                                    "MCP_JSON_REPRESENTATION",
+                                    "mcp.json 超出当前解析器表示能力（如数值范围或嵌套深度）",
+                                );
+                                representation_block(plugin);
+                            }
+                        },
+                        Err(ReadError::InputChanged) => {
                             error(
                                 errors,
                                 &path,
-                                "MCP_JSON_REPRESENTATION",
-                                "mcp.json 的 JSON 数值超出当前解析器表示能力",
+                                "INPUT_CHANGED",
+                                "读取 mcp.json 时输入发生变化",
                             );
-                            representation_block(plugin);
+                            coverage(
+                                plugin,
+                                RuleId::McpEnvelope,
+                                "mcp.json",
+                                CoverageStatus::Unchecked,
+                                "INPUT_CHANGED",
+                            );
                         }
-                    },
-                    Err(ReadError::InputChanged) => {
-                        error(
-                            errors,
-                            &path,
-                            "INPUT_CHANGED",
-                            "读取 mcp.json 时输入发生变化",
-                        );
-                        coverage(
-                            plugin,
-                            RuleId::McpEnvelope,
-                            "mcp.json",
-                            CoverageStatus::Unchecked,
-                            "INPUT_CHANGED",
-                        );
+                        Err(ReadError::Unsafe) => {
+                            error(
+                                errors,
+                                &path,
+                                "MCP_READ",
+                                "mcp.json 不是可安全读取的普通文件",
+                            );
+                            coverage(
+                                plugin,
+                                RuleId::McpEnvelope,
+                                "mcp.json",
+                                CoverageStatus::Unchecked,
+                                "MCP_READ",
+                            );
+                        }
+                        Err(ReadError::Io(_)) => {
+                            error(errors, &path, "MCP_READ", "无法读取 mcp.json 内容");
+                            coverage(
+                                plugin,
+                                RuleId::McpEnvelope,
+                                "mcp.json",
+                                CoverageStatus::Unchecked,
+                                "MCP_READ",
+                            );
+                        }
                     }
-                    Err(ReadError::Unsafe) => {
-                        error(
-                            errors,
-                            &path,
-                            "MCP_READ",
-                            "mcp.json 不是可安全读取的普通文件",
-                        );
-                        coverage(
-                            plugin,
-                            RuleId::McpEnvelope,
-                            "mcp.json",
-                            CoverageStatus::Unchecked,
-                            "MCP_READ",
-                        );
-                    }
-                    Err(ReadError::Io(_)) => {
-                        error(errors, &path, "MCP_READ", "无法读取 mcp.json 内容");
-                        coverage(
-                            plugin,
-                            RuleId::McpEnvelope,
-                            "mcp.json",
-                            CoverageStatus::Unchecked,
-                            "MCP_READ",
-                        );
-                    }
-                },
+                }
             },
         },
     }
@@ -361,11 +379,19 @@ fn stdio(
         "STDIO_VARIANT_VALID",
     );
     let command = o["command"].as_str().expect("checked");
+    let command_target = target(pointer, "command");
     if command.is_empty()
         || command.starts_with('/')
         || command.starts_with("../")
         || (!command.starts_with("./") && command.contains('/'))
     {
+        coverage_id(
+            plugin,
+            "AP-PATH-RELATIVE-FORM",
+            &command_target,
+            CoverageStatus::Fail,
+            "COMMAND_RELATIVE_FORM",
+        );
         return skip(
             plugin,
             RuleId::McpCommand,
@@ -375,8 +401,14 @@ fn stdio(
             "command 不得为绝对路径或父目录路径",
         );
     }
-    let command_target = target(pointer, "command");
     if command.starts_with("./") {
+        coverage_id(
+            plugin,
+            "AP-PATH-RELATIVE-FORM",
+            &command_target,
+            CoverageStatus::Pass,
+            "COMMAND_DOT_SLASH_FORM",
+        );
         match inside(
             root,
             root.join(command),
@@ -418,6 +450,13 @@ fn stdio(
             "AMBIGUOUS_COMMAND",
         );
     } else {
+        coverage_id(
+            plugin,
+            "AP-PATH-RELATIVE-FORM",
+            &command_target,
+            CoverageStatus::NotApplicable,
+            "COMMAND_BARE_NAME",
+        );
         coverage(
             plugin,
             RuleId::McpCommand,
@@ -451,6 +490,13 @@ fn stdio(
     if let Some(cwd) = o.get("cwd").and_then(Value::as_str) {
         cwd_check(root, plugin, errors, name, pointer, cwd);
     } else {
+        coverage_id(
+            plugin,
+            "AP-PATH-RELATIVE-FORM",
+            &target(pointer, "cwd"),
+            CoverageStatus::NotApplicable,
+            "CWD_DEFAULT_ROOT",
+        );
         coverage(
             plugin,
             RuleId::McpCwdForm,
@@ -658,6 +704,13 @@ fn cwd_check(
     let root_form = cwd == "${PLUGIN_ROOT}" || cwd.starts_with("${PLUGIN_ROOT}/");
     let data_form = cwd == "${PLUGIN_DATA}" || cwd.starts_with("${PLUGIN_DATA}/");
     if !(cwd.starts_with("./") || root_form || data_form) {
+        coverage_id(
+            plugin,
+            "AP-PATH-RELATIVE-FORM",
+            &target(pointer, "cwd"),
+            CoverageStatus::Fail,
+            "CWD_RELATIVE_FORM",
+        );
         skip(
             plugin,
             RuleId::McpCwdForm,
@@ -668,6 +721,13 @@ fn cwd_check(
         );
         return;
     }
+    coverage_id(
+        plugin,
+        "AP-PATH-RELATIVE-FORM",
+        &target(pointer, "cwd"),
+        CoverageStatus::Pass,
+        "CWD_RELATIVE_FORM_VALID",
+    );
     if data_form || cwd.contains("${PLUGIN_DATA}") {
         coverage(
             plugin,
@@ -940,6 +1000,20 @@ fn coverage(
         reason_code: Some(reason.into()),
     });
 }
+fn coverage_id(
+    plugin: &mut PluginReport,
+    rule_id: &str,
+    target: &str,
+    status: CoverageStatus,
+    reason: &str,
+) {
+    plugin.coverage.push(Coverage {
+        rule_id: rule_id.into(),
+        target: target.into(),
+        status,
+        reason_code: Some(reason.into()),
+    });
+}
 fn disable(
     plugin: &mut PluginReport,
     rule: RuleId,
@@ -971,6 +1045,20 @@ fn disable(
             CoverageStatus::Fail,
             code,
         );
+    }
+    for id in [
+        "AP-MCP-BUNDLED-COMMAND",
+        "AP-MCP-PATH-DEPENDENCE",
+        "AP-MCP-HEADER-SECRETS",
+        "AP-MCP-ENV-SECRETS",
+        "AP-MCP-COMMAND",
+    ] {
+        plugin.coverage.push(Coverage {
+            rule_id: id.into(),
+            target: "mcp.json".into(),
+            status: CoverageStatus::Blocked,
+            reason_code: Some(code.into()),
+        });
     }
 }
 fn skip(

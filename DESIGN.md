@@ -13,7 +13,7 @@
 ```text
 crates/agent-skills-lint/              # lib，与 plugin 无反向依赖
   src/lib.rs                         # 稳定公共重导出
-  src/model.rs                       # SkillDocument、SkillProperties
+  src/model.rs                       # SkillProperties
   src/parser.rs                      # 完整 YAML、行级 frontmatter 边界
   src/diagnostic.rs                   # SkillRule、SkillIssueKind、SkillIssue、SkillReport
   src/validator.rs                   # 纯数据判定
@@ -23,11 +23,11 @@ crates/agent-plugin-lint/              # lib + ap-lint
   src/report.rs                      # Finding/Scope/Effect/Coverage/ToolError
   src/rules.rs                       # RuleId 枚举及规则元数据
   src/manifest.rs                    # JSON 投影、白名单、name、类型
-  src/discovery.rs                   # plugin/collection、固定位置、直接 skill
+  src/lint.rs                        # plugin/collection、manifest门禁、聚合/coverage
   src/containment.rs                 # 文件系统真实路径与读取门禁
   src/skills.rs                      # 安全读取后调用 skill 库，结构化薄适配
   src/mcp.rs                         # envelope -> 各 server；不启动服务
-  src/extensions.rs                  # 对象/namespace；不解释未知 value
+  src/json.rs                        # JSON语法/表示能力、重复键；extensions归manifest
   src/expansion.rs                   # 单次精确占位符替换
   src/vendor.rs                      # include_str 与身份/字段对照
   src/main.rs                        # 参数、文本/JSON 输出、退出码
@@ -81,11 +81,11 @@ Report 字段：schemaVersion=1、toolVersion、rulesetVersion、specVersion=1.0
 
 排序：plugin root；finding 按 path/pointer/ruleId/scope/effect；coverage 按 ruleId/target/status；errors 按 path/code。无时间戳。同一输入、平台、版本 JSON 两次运行逐字节相同。稳定消费者依赖枚举、ID、证据码，不能解析人类消息。规范解释变化升 rulesetVersion。
 
-D4 尚待飞鸢正式裁决，本轮可审阅默认：确定的包侧 normative MUST 全部使退出 1，包含 ignored；只有 advisory 返回 0。`--strict` 额外拦截 advisory 与选定静态规则的 unchecked；manual/runtime/not-applicable/blocked 不因本身导致失败。这只是 CI 政策，不提升半径。无找到包、IO/参数/歧义返回 2。
+D4 尚待飞鸢正式裁决，本轮可审阅默认：确定的包侧 normative MUST 全部使退出 1，包含 ignored；只有 advisory 返回 0。`--strict` 额外拦截 advisory 与选定静态规则的 unchecked；manual/runtime/not-applicable/blocked 不因本身导致失败。末尾 registry 中没有目标级执行记录的包侧条目标 `unchecked/RULE_NOT_EVALUATED`，不能据缺记录推断目标不存在。这类索引占位未纳入 strict 的选择；具体目标上的静态 unchecked 仍纳入，不能用占位例外掩盖实际能力缺口。这只是 CI 政策，不提升半径。无找到包、IO/参数/歧义返回 2。
 
 ## 5. manifest 与目录发现
 
-manifest 先安全读取，再严格 JSON 和顶层对象。JSON 语法与解析器能力分开：以 RawValue 验证完整语法；若语法合法但 Value 无法表示数值范围，记录工具能力错误及 unchecked/blocked，不能当作 JSON 违规。不得仅开启 arbitrary_precision 而把真实 `$serde_json::private::Number` 对象键误认内部数值标记。未知顶层键逐个 ignored；非对象 extensions ignored；其他确定违规 fatal 后不读组件（§5.2、§11.3）。metadata 只检查正文类型，不因 URL/email/SPDX/版本格式拒包（§5.4）；SemVer 可给 advisory。内层 author 是闭合集合。plugin name 和 skill name 是两种规则，plugin 可以有点。
+manifest 先安全读取，再严格 JSON 和顶层对象。JSON 语法与解析器能力分开：以 RawValue 验证完整语法；若语法合法但 Value 超出数值范围或嵌套深度能力，记录工具能力错误及 unchecked/blocked，不能当作 JSON 违规。不得仅开启 arbitrary_precision 而把真实 `$serde_json::private::Number` 对象键误认内部数值标记。未知顶层键逐个 ignored；非对象 extensions ignored；其他确定违规 fatal 后不读组件（§5.2、§11.3）。metadata 只检查正文类型，不因 URL/email/SPDX/版本格式拒包（§5.4）；SemVer 可给 advisory。内层 author 是闭合集合。plugin name 和 skill name 是两种规则，plugin 可以有点。
 
 `ap-lint <path> [--mode auto|plugin|collection] [--spec 1.0.0] [--json|--format text|json] [--strict]`。无 --fix、--host、SARIF、外部 skills-report。未知参数返回 2。--spec 不覆写 manifest 声明。self-test 可后置，开发用 cargo test 做真实验证，不宣称空自检有效。
 
@@ -95,7 +95,7 @@ auto 先枚举精确 plugin.json（坏 JSON、目录、断链也算入口）；�
 
 ## 6. 文件系统包含与安全读取
 
-`ResolvedRoot` 保存真实 PathBuf；`PathRole` 区分 Manifest/FixedSkills/FixedMcp/Skill/ServerCommand/ServerCwd/Resource。`Containment` 为 Inside/Outside/Unresolved，后者带原因。外部路径只读取判定所需元数据，不读正文或枚举外部目录。
+根以 canonical `PathBuf` 保存；调用分支区分 manifest、固定组件、skill、server command/cwd、resource，传入对应 Scope/Effect。`Resolution` 为 Inside(PathBuf)/Outside/Unresolved，`resolve` 的 IO 错误保留为 Result；`ReadError` 区分 InputChanged/Unsafe/Io。外部路径只读取判定所需元数据，不读正文或枚举外部目录。
 
 保留 `link/..` 原始路径交内核 `std::fs::canonicalize`，禁止先 components 折叠或词法 normalize；Rust canonicalize 在本平台实测 link/.. 与内核打开结果一致后方可依赖。比较 canonical Path 的 `starts_with`（组件级），禁止字符串前缀。根可为 symlink，根目标定义包边界。不存在/断链/循环不能一律称逃逸。
 
@@ -129,7 +129,7 @@ extensions 非对象 ignored；unknown namespace value 整体不检查（§8.1�
 
 每片由 astra 验收后才能继续；缺陷退回同一 terra agent 修复。astra 负责提交与推送。每条已选包侧静态规则需要正反例或显式未实现状态；client/publisher/runtime 不能靠假包 fixture 宣称验证。91 条索引不是 91 条可静态证明的规则。
 
-真实靶子 HEAD 见 PROVENANCE。期望 11 plugin、24 skill 候选、0 MCP；两 references 逃逸 ignored/deny-path，guided-review 逃逸 component/skip-skill，共三条确定路径逃逸。若新 HEAD 语料变化先如实记录，不修改它来迎合预期。最终报告区分源码树、安装产物、MCP 静态配置与真实连接；未启动服务不能称连接验过。
+真实靶子 HEAD 见 research/PROVENANCE.md。期望 11 plugin、24 skill 候选、0 MCP；两 references 逃逸 ignored/deny-path，guided-review 逃逸 component/skip-skill，共三条确定路径逃逸。若新 HEAD 语料变化先如实记录，不修改它来迎合预期。最终报告区分源码树、安装产物、MCP 静态配置与真实连接；未启动服务不能称连接验过。
 
 ## 9. 待飞鸢裁决与非目标
 

@@ -32,4 +32,16 @@ mod tests {
         );
         assert_eq!(once("x${OTHER}", "R", "D"), "x${OTHER}");
     }
+
+    #[test]
+    fn all_replacements_are_single_pass() {
+        assert_eq!(
+            once(
+                "${PLUGIN_ROOT}${PLUGIN_ROOT}${UNKNOWN}",
+                "${PLUGIN_DATA}",
+                "D"
+            ),
+            "${PLUGIN_DATA}${PLUGIN_DATA}${UNKNOWN}"
+        );
+    }
 }

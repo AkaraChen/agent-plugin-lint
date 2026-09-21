@@ -27,7 +27,7 @@
 
 ## 尚未验证
 
-引擎各切片待 review。Windows/macOS、实际宿主加载、安装器产物、MCP 启动/连接/认证/握手、PLUGIN_DATA 生命周期、秘密真实性、域名控制权、完整客户端符合性、发布安装尚未验证。
+本轮源码引擎切片已按下文范围复验；以下不在已验证范围：Windows/macOS、实际宿主加载、安装器产物、MCP 启动/连接/认证/握手、PLUGIN_DATA 生命周期、秘密真实性、域名控制权、完整客户端符合性、发布安装尚未验证。
 
 ## S1 首轮：退回
 
@@ -76,3 +76,48 @@ S4 接受：astra 最后独立执行74个常规测试、clippy、fmt、build、4
 ## S5a 接受
 
 astra 独立执行79个常规Rust测试、clippy、fmt、build，以及10 JSON边界+10 extensions+42 MCP+21 filesystem+18 skills+6 CLI错误+25完整CLI黑盒，共132个；显式真实语料ignored测试1/1通过。核对§8/§8.1：未知namespace值不验证，不推断同名目录必须存在；空名/路径分隔符拒绝，其他语法欠定unchecked。JSON语法与表示能力分离，1e400及额外160层合法嵌套探针均exit2而非JSON违规；重复键按最后值检查并仅advisory，strict提升。§5.2与§7.2父级失败门禁保持。过深输入当前提示写“数值”偏窄，S5b改为通用解析器表示能力措辞。
+
+## S5b 首轮：退回
+
+astra 独立运行83个常规Rust测试、clippy、fmt、build通过；44个已实现RuleId元数据与原表对照通过，内嵌91条registry JSON与原表逐项相同。root coverage.py初版正则错误收集6条规则组摘要，97不是规则数量；已修正精确ID提取，未削弱状态断言。随后实测合法DATA cwd的MCP strict错误返回1，原因是P/M人工规则被标为静态unchecked。8个进一步证据一致性探针全部失败：已读manifest、有效MCP、component/resource finding、skill语义人工项、JSON表示能力父级错误、MCP envelope错误、ignored extensions的coverage分支均存在错误N/A或未阻断状态。已全部退回terra；不能用83测试通过替代报告正确性。
+
+S5b 第二轮：astra 独立执行整套18条验证命令（locked/offline Rust测试、clippy、fmt、doc、build、显式语料、9份黑盒/运行观察、双crate包清单）通过。源码复查仍发现旧分支未完成：坏MCP同rule/target同时blocked与manual、relative form没有实际coverage、正常skills固定/skill containment缺实际pass。强化coverage_edges为10项后7过3失败。已换新terra会话，限定coverage证据收口，不接受“脚本绿但分支缺失”的实现；此前18条命令通过不等于S5b验收通过。
+
+## S5b 接受与最终复验（2026-09-21）
+
+换新terra会话后，astra核对了实际分支中的位置/包含/relative-form记录、finding对应fail、MCP gate后继blocked及同rule/target状态一致性。末尾registry无目标级记录的包侧条目统一明确为unchecked/RULE_NOT_EVALUATED，取消“缺记录意味着目标不存在”的假设。此索引占位未被strict选择；实际目标上的静态unchecked仍被strict提升，最小包/MIT/DATA runtime为0、IP语法歧义strict为1。该选择已写入DESIGN和README，不将全部91条注册项称为静态已验。
+
+astra最终亲自执行以下命令，均通过（本机Ubuntu，rustc/cargo 1.97.1）：
+
+```sh
+cargo fmt --all -- --check
+cargo test --workspace --locked --offline
+cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+cargo doc --workspace --no-deps --locked --offline
+cargo build -p agent-plugin-lint --locked --offline
+AP_LINT_CORPUS=/home/akrc/Developer/eric-way/plugins cargo test -p agent-plugin-lint --test s3 --locked --offline corpus -- --ignored
+AP_LINT_CORPUS=/home/akrc/Developer/eric-way/plugins python3 scripts/review/cli.py full
+python3 scripts/review/filesystem.py full
+python3 scripts/review/s2b.py
+python3 scripts/review/skills.py
+python3 scripts/review/mcp.py
+python3 scripts/review/json_edges.py
+python3 scripts/review/extensions.py
+python3 scripts/review/coverage.py
+python3 scripts/review/coverage_edges.py
+AP_LINT_CORPUS=/home/akrc/Developer/eric-way/plugins python3 scripts/review/runtime.py
+cargo package -p agent-plugin-lint --list --offline --allow-dirty
+cargo package -p agent-skills-lint --list --offline --allow-dirty
+```
+
+结果为85个常规Rust测试、另1个显式真实语料测试；9份黑盒脚本共152个用例（25+21+6+18+42+10+10+10+10）。doc构建通过，当前无doctest示例，不能把0个doctest当额外API覆盖。44个已实现RuleId的半径/义务/主体/规范性另作临时Rust测试与原表对照通过，测试文件已删除；内嵌91条完整registry元数据与原表逐项一致。
+
+真实引擎扫描11包，24直接skill候选，23个安全SKILL.md进入库，1个越界skill被跳过，0 MCP配置。精确命中上表三条逃逸：两个资源ignored/deny-path（§4.1(3)及最窄边界第5项），guided-review为component/skip-skill（§4.1最窄边界第3项、§7.1）。最终summary为fatal=0、component=1、ignored=2、advisory=1、errors=0，exit=1。额外advisory是review包的AP-ADVICE-SKILLS-UNCHECKED，不是第四条逃逸；未读取的skill不被包装成合规。相同输入两次JSON逐字节一致，全语料coverage键唯一。
+
+`runtime.py`实际把二进制复制到仓库外，用strace观察独立MCP样例、未知schema URL、真实语料三个输入：网络系统调用均0，命令哨兵均未执行，扫描前后输入内容/链接/权限快照一致。源码审计也未发现生产网络请求、子进程执行或写入输入的路径；命令/FIFO写入仅在cfg(test)测试模块。此为已覆盖输入的观察，不是形式化证明。尝试`unshare -Urn true`被本机拒绝（写/proc/self/uid_map: Operation not permitted），未声称网络命名空间隔离验过。
+
+两份随crate分发的schema与research原始字节、Git blob、SHA-256再次一致；plugin包清单含schema/Apache-2.0/来源说明/MIT，skills包含MIT/迁移说明。仅检查Cargo包清单，没有验证registry发布或完整发布包安装。原设计目录12文件SHA-256与开始基线一致；skills-ref仍为6c89f06b且工作区干净、未归档；eric-way仍为只读37d007ca快照且工作区干净。
+
+未验：Windows/macOS/junction平台行为，原子文件系统快照或完整竞态安全证明，宿主加载/安装器产物，MCP启动/连接/认证/握手，PLUGIN_DATA生命周期，秘密真实性、域名控制权、完整客户端合规、固定tokenizer预算、crates.io发行及安装。没有配置远程CI，不声称GitHub Actions通过。运行期未知项、Unicode/NFKC及RULE_NOT_EVALUATED继续以未检查/人工/运行时状态公开。
+
+待飞鸢裁决仍为D3未知扩展作者侧语义、D4默认ignored MUST及strict选择政策、D5欠定语法接受域、D6 AS快照/Unicode裁决、D7宿主与发行范围、D8平台承诺。新库接口形状已按本轮Rust设计落地；旧库归档仍是另行授权的后续动作。

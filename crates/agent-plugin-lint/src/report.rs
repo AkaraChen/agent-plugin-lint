@@ -1,6 +1,6 @@
 use crate::RuleId;
-use serde::Serialize;
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+use serde::{Deserialize, Serialize};
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Radius {
     Fatal,
@@ -8,7 +8,7 @@ pub enum Radius {
     Ignored,
     Advisory,
 }
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum Effect {
     RejectPlugin,
@@ -32,7 +32,7 @@ impl Effect {
         }
     }
 }
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Obligation {
     Must,
@@ -40,7 +40,7 @@ pub enum Obligation {
     Recommended,
     None,
 }
-#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum Subject {
     Package,

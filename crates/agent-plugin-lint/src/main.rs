@@ -140,17 +140,41 @@ fn print_help() {
 }
 fn print_text(report: &Report) {
     for error in &report.errors {
-        eprintln!("错误 [{}] {}：{}", error.code, error.path, error.message);
+        println!("错误 [{}] {}：{}", error.code, error.path, error.message);
     }
     for plugin in &report.plugins {
+        println!("插件根：{}（状态：{}）", plugin.root, plugin.status);
         for finding in &plugin.findings {
-            eprintln!(
-                "{} {} {}",
+            let spec = finding.spec.join("、");
+            let pointer = finding.pointer.as_deref().unwrap_or("/");
+            let hint = finding.hint.as_deref().unwrap_or("无");
+            println!(
+                "{} {} {} {} [{}] field={} hint={}：{}",
                 finding.rule_id.as_str(),
                 finding.path,
+                spec,
+                finding.evidence_code,
+                plugin.root,
+                pointer,
+                hint,
                 finding.message
             );
         }
+        for coverage in &plugin.coverage {
+            if !matches!(
+                coverage.status,
+                agent_plugin_lint::CoverageStatus::Pass
+                    | agent_plugin_lint::CoverageStatus::NotApplicable
+            ) {
+                println!(
+                    "coverage {} {} {}（{}）",
+                    coverage.rule_id,
+                    coverage.target,
+                    coverage.status.as_str(),
+                    coverage.reason_code.as_deref().unwrap_or("无原因")
+                );
+            }
+        }
     }
-    eprintln!("退出码：{}", report.exit_code);
+    println!("退出码：{}", report.exit_code);
 }

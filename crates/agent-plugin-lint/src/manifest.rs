@@ -27,6 +27,8 @@ pub struct ManifestValidation {
     pub name: Option<String>,
     pub declared_spec: Option<String>,
     pub duplicate_json_keys: Option<bool>,
+    pub has_license: bool,
+    pub has_extensions: bool,
 }
 
 pub fn validate_manifest(value: &Value) -> ManifestValidation {
@@ -41,6 +43,8 @@ pub fn validate_manifest(value: &Value) -> ManifestValidation {
         state.block_all_except(RuleId::ManifestJson, "ROOT_NOT_OBJECT");
         return state.finish();
     };
+    state.has_license = manifest.contains_key("license");
+    state.has_extensions = manifest.contains_key("extensions");
     state.pass(RuleId::ManifestJson);
     validate_unknown_fields(manifest, &mut state);
     let schema_valid = required(manifest, "$schema", &mut state);
@@ -108,6 +112,8 @@ struct State {
     rejected: bool,
     name: Option<String>,
     declared_spec: Option<String>,
+    has_license: bool,
+    has_extensions: bool,
 }
 impl State {
     fn pass(&mut self, rule: RuleId) {
@@ -200,6 +206,8 @@ impl State {
             name: self.name,
             declared_spec: self.declared_spec,
             duplicate_json_keys: None,
+            has_license: self.has_license,
+            has_extensions: self.has_extensions,
         }
     }
 }

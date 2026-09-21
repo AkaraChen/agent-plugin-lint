@@ -295,7 +295,7 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                                 root_name,
                                 &manifest_path,
                                 "MANIFEST_JSON_REPRESENTATION",
-                                "plugin.json 的 JSON 数值超出当前解析器表示能力",
+                                "plugin.json 超出当前解析器表示能力（如数值范围或嵌套深度）",
                             ),
                         },
                         Err(crate::containment::ReadError::InputChanged) => outcome_error(
@@ -389,6 +389,22 @@ fn from_validation(
         findings: validation.findings,
         coverage,
     };
+    plugin.coverage.push(Coverage {
+        rule_id: RuleId::ManifestLocation.as_str().into(),
+        target: "plugin.json".into(),
+        status: CoverageStatus::Pass,
+        reason_code: Some("MANIFEST_AT_ROOT".into()),
+    });
+    plugin.coverage.push(Coverage {
+        rule_id: RuleId::PathManifestEscape.as_str().into(),
+        target: "plugin.json".into(),
+        status: CoverageStatus::Pass,
+        reason_code: Some("MANIFEST_CONTAINED".into()),
+    });
+    // Preserve context required to distinguish an absent target from a rule
+    // the current static scanner deliberately does not implement.
+    let has_license = validation.has_license;
+    let has_extensions = validation.has_extensions;
     if validation.duplicate_json_keys == Some(true) {
         add_finding(
             &mut plugin,
@@ -460,7 +476,126 @@ fn from_validation(
             }
         }
     }
+    annotate_unimplemented_context(&mut plugin, has_license, has_extensions);
     PluginOutcome { plugin, errors }
+}
+
+fn annotate_unimplemented_context(
+    plugin: &mut PluginReport,
+    has_license: bool,
+    has_extensions: bool,
+) {
+    // Manual author/runtime questions are meaningful only after the MCP
+    // envelope was accepted.  A rejected envelope blocks those questions;
+    // it must not receive a second, contradictory manual state.
+    let mcp_present = plugin.coverage.iter().any(|coverage| {
+        coverage.rule_id == RuleId::McpEnvelope.as_str() && coverage.status == CoverageStatus::Pass
+    });
+    let reason = if plugin.status == "rejected" {
+        "MANIFEST_REJECTED"
+    } else {
+        "STATIC_NOT_IMPLEMENTED"
+    };
+    if has_license {
+        plugin.coverage.push(Coverage {
+            rule_id: "AP-LICENSE-SPDX".into(),
+            target: "plugin.json#/license".into(),
+            status: if plugin.status != "accepted" {
+                CoverageStatus::Blocked
+            } else {
+                CoverageStatus::Manual
+            },
+            reason_code: Some(if plugin.status != "accepted" {
+                reason.into()
+            } else {
+                "PUBLISHER_MANUAL".into()
+            }),
+        });
+    }
+    if has_extensions {
+        let extensions_ignored = plugin.coverage.iter().any(|coverage| {
+            coverage.rule_id == RuleId::ExtensionsObject.as_str()
+                && coverage.status == CoverageStatus::Fail
+        });
+        for id in ["AP-EXTENSION-VALUE", "AP-EXTENSION-FILE-LOCATION"] {
+            plugin.coverage.push(Coverage {
+                rule_id: id.into(),
+                target: "plugin.json#/extensions".into(),
+                status: if plugin.status != "accepted" || extensions_ignored {
+                    CoverageStatus::Blocked
+                } else {
+                    CoverageStatus::Manual
+                },
+                reason_code: Some(if plugin.status == "rejected" {
+                    "MANIFEST_REJECTED".into()
+                } else {
+                    "UNIMPLEMENTED_NAMESPACE".into()
+                }),
+            });
+        }
+    }
+    if mcp_present {
+        plugin.coverage.push(Coverage {
+            rule_id: "AP-ENV-BASE-DEPENDENCE".into(),
+            target: "mcp.json".into(),
+            status: if plugin.status != "accepted" {
+                CoverageStatus::Blocked
+            } else {
+                CoverageStatus::Manual
+            },
+            reason_code: Some(if plugin.status != "accepted" {
+                reason.into()
+            } else {
+                "RUNTIME_ENVIRONMENT".into()
+            }),
+        });
+        for id in [
+            "AP-MCP-BUNDLED-COMMAND",
+            "AP-MCP-PATH-DEPENDENCE",
+            "AP-MCP-HEADER-SECRETS",
+            "AP-MCP-ENV-SECRETS",
+        ] {
+            plugin.coverage.push(Coverage {
+                rule_id: id.into(),
+                target: "mcp.json".into(),
+                status: if plugin.status != "accepted" {
+                    CoverageStatus::Blocked
+                } else {
+                    CoverageStatus::Manual
+                },
+                reason_code: Some(if plugin.status != "accepted" {
+                    reason.into()
+                } else {
+                    "PUBLISHER_OR_RUNTIME_MANUAL".into()
+                }),
+            });
+        }
+        if plugin.coverage.iter().any(|coverage| {
+            coverage.rule_id == RuleId::McpEnvelope.as_str()
+                && coverage.status == CoverageStatus::Pass
+        }) {
+            for id in [RuleId::DiscoveryKind, RuleId::PathFixedEscape] {
+                plugin.coverage.push(Coverage {
+                    rule_id: id.as_str().into(),
+                    target: "mcp.json".into(),
+                    status: CoverageStatus::Pass,
+                    reason_code: Some("MCP_FIXED_FILE_CONTAINED".into()),
+                });
+            }
+        }
+    }
+    if plugin
+        .coverage
+        .iter()
+        .any(|coverage| coverage.target.ends_with("/SKILL.md"))
+    {
+        plugin.coverage.push(Coverage {
+            rule_id: "AS-DESCRIPTION-QUALITY".into(),
+            target: "skills".into(),
+            status: CoverageStatus::Manual,
+            reason_code: Some("QUALITY_MANUAL".into()),
+        });
+    }
 }
 
 fn outcome_representation(root: String, path: &Path, code: &str, message: &str) -> PluginOutcome {
@@ -489,6 +624,7 @@ pub(crate) fn add_finding(
     message: &str,
 ) {
     let meta = rule.metadata();
+    let coverage_target = path.clone();
     plugin.findings.push(Finding {
         rule_id: rule,
         spec: meta.spec.iter().map(|x| (*x).into()).collect(),
@@ -507,6 +643,15 @@ pub(crate) fn add_finding(
         message: message.into(),
         hint: None,
     });
+    // A finding is itself evidence that this exact rule was evaluated.  Keep
+    // that evidence next to the finding rather than asking the registry
+    // backfill to infer it later.
+    plugin.coverage.push(Coverage {
+        rule_id: rule.as_str().into(),
+        target: coverage_target,
+        status: CoverageStatus::Fail,
+        reason_code: Some(code.into()),
+    });
 }
 
 pub(crate) fn add_finding_pointer(
@@ -519,6 +664,9 @@ pub(crate) fn add_finding_pointer(
     message: &str,
 ) {
     let meta = rule.metadata();
+    let coverage_target = pointer
+        .as_deref()
+        .map_or_else(|| path.clone(), |pointer| format!("{path}#{pointer}"));
     plugin.findings.push(Finding {
         rule_id: rule,
         spec: meta.spec.iter().map(|x| (*x).into()).collect(),
@@ -536,6 +684,12 @@ pub(crate) fn add_finding_pointer(
         evidence_code: code.into(),
         message: message.into(),
         hint: None,
+    });
+    plugin.coverage.push(Coverage {
+        rule_id: rule.as_str().into(),
+        target: coverage_target,
+        status: CoverageStatus::Fail,
+        reason_code: Some(code.into()),
     });
 }
 
@@ -575,7 +729,21 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
     }
     let skills_actual = match crate::containment::resolve(root, &skills) {
         Ok(crate::containment::Resolution::Inside(p)) => match crate::containment::directory(&p) {
-            Ok(true) => p,
+            Ok(true) => {
+                plugin.coverage.push(Coverage {
+                    rule_id: RuleId::DiscoveryKind.as_str().into(),
+                    target: "skills".into(),
+                    status: CoverageStatus::Pass,
+                    reason_code: Some("SKILLS_DIRECTORY".into()),
+                });
+                plugin.coverage.push(Coverage {
+                    rule_id: RuleId::PathFixedEscape.as_str().into(),
+                    target: "skills".into(),
+                    status: CoverageStatus::Pass,
+                    reason_code: Some("SKILLS_CONTAINED".into()),
+                });
+                p
+            }
             Ok(false) => {
                 add_finding(
                     plugin,
@@ -771,6 +939,12 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 match crate::containment::regular(&actual) {
                     Ok(true) => match crate::containment::read_safe(root, &md) {
                         Ok(source) => {
+                            plugin.coverage.push(Coverage {
+                                rule_id: RuleId::PathSkillEscape.as_str().into(),
+                                target: md_logical.clone(),
+                                status: CoverageStatus::Pass,
+                                reason_code: Some("SKILL_CONTAINED".into()),
+                            });
                             crate::skills::validate(
                                 &source,
                                 &name,
@@ -965,13 +1139,21 @@ fn audit_dir(
                 "RESOURCE_OUTSIDE_ROOT",
                 "资源路径位于包根之外，访问时会被拒绝",
             ),
-            Ok(crate::containment::Resolution::Inside(real)) => match fs::metadata(&real) {
-                Ok(metadata) if metadata.is_dir() => {
-                    audit_dir(root, &path, &lp, plugin, seen, errors)
+            Ok(crate::containment::Resolution::Inside(real)) => {
+                plugin.coverage.push(Coverage {
+                    rule_id: RuleId::PathResourceEscape.as_str().into(),
+                    target: lp.clone(),
+                    status: CoverageStatus::Pass,
+                    reason_code: Some("RESOURCE_CONTAINED".into()),
+                });
+                match fs::metadata(&real) {
+                    Ok(metadata) if metadata.is_dir() => {
+                        audit_dir(root, &path, &lp, plugin, seen, errors)
+                    }
+                    Ok(_) => {}
+                    Err(_) => error(errors, &path, "RESOURCE_METADATA_IO", "无法读取资源元数据"),
                 }
-                Ok(_) => {}
-                Err(_) => error(errors, &path, "RESOURCE_METADATA_IO", "无法读取资源元数据"),
-            },
+            }
             Ok(crate::containment::Resolution::Unresolved) => add_finding(
                 plugin,
                 RuleId::AdviceUnresolvedPath,
@@ -1114,6 +1296,8 @@ fn finish_report(report: &mut Report) {
     let mut must_violation = false;
     let mut strict_violation = false;
     for plugin in &mut report.plugins {
+        ensure_registry_coverage(plugin);
+        normalize_coverage(&mut plugin.coverage);
         plugin.findings.sort_by(|left, right| {
             (
                 &left.path,
@@ -1142,11 +1326,16 @@ fn finish_report(report: &mut Report) {
                 && finding.confidence == crate::Confidence::Certain
                 && finding.subject == Subject::Package
                 && finding.obligation == Obligation::Must;
-            strict_violation |= finding.radius == Radius::Advisory;
+            strict_violation |=
+                finding.radius == Radius::Advisory && finding.subject == Subject::Package;
         }
         strict_violation |= plugin.coverage.iter().any(|coverage| {
-            coverage.rule_id == RuleId::AdviceDuplicateJsonKey.as_str()
+            crate::rules::registry_subject(&coverage.rule_id) == Subject::Package
                 && coverage.status == CoverageStatus::Unchecked
+                // The registry is an audit index, not fabricated evidence of
+                // a concrete target. Strict only promotes unchecked results
+                // produced by an actual target-level scanner branch.
+                && coverage.reason_code.as_deref() != Some("RULE_NOT_EVALUATED")
         });
     }
     report.summary = summary;
@@ -1158,6 +1347,67 @@ fn finish_report(report: &mut Report) {
     } else {
         0
     };
+}
+
+/// Fill the original 91-row table after concrete scanners have recorded their
+/// branch-level result.  An index entry with no target-level evidence is not
+/// evidence that the target is absent, so package rules remain unchecked.
+/// Concrete scanners alone may record `not-applicable`.
+fn ensure_registry_coverage(plugin: &mut PluginReport) {
+    let blocked_by_parent = plugin.status != "accepted";
+    for rule in crate::rules::rule_registry() {
+        if plugin
+            .coverage
+            .iter()
+            .any(|coverage| coverage.rule_id == rule.id)
+        {
+            continue;
+        }
+        let finding = plugin
+            .findings
+            .iter()
+            .find(|finding| finding.rule_id.as_str() == rule.id);
+        let (status, reason) = if finding.is_some() {
+            (CoverageStatus::Fail, "FINDING_RECORDED")
+        } else if blocked_by_parent {
+            (CoverageStatus::Blocked, "MANIFEST_REJECTED")
+        } else {
+            match rule.subject {
+                Subject::Client | Subject::Publisher => {
+                    (CoverageStatus::Manual, "CLIENT_OR_PUBLISHER_MANUAL")
+                }
+                Subject::Package => (CoverageStatus::Unchecked, "RULE_NOT_EVALUATED"),
+                Subject::Tool => (CoverageStatus::Unchecked, "TOOL_POLICY_UNAVAILABLE"),
+            }
+        };
+        plugin.coverage.push(Coverage {
+            rule_id: rule.id.into(),
+            target: "plugin".into(),
+            status,
+            reason_code: Some(reason.into()),
+        });
+    }
+}
+
+/// Coalesce duplicate reports of the *same* branch only when they agree.  A
+/// conflicting state is intentionally retained: it is an engine bug that the
+/// coverage contract tests must expose, not a precedence decision that may be
+/// hidden at serialization time.
+fn normalize_coverage(coverage: &mut Vec<Coverage>) {
+    let mut normalized = std::collections::BTreeMap::<(String, String), Coverage>::new();
+    let mut conflicts = Vec::new();
+    for item in coverage.drain(..) {
+        let key = (item.rule_id.clone(), item.target.clone());
+        match normalized.get(&key) {
+            Some(existing) if existing.status == item.status => {}
+            Some(_) => conflicts.push(item),
+            _ => {
+                normalized.insert(key, item);
+            }
+        }
+    }
+    coverage.extend(normalized.into_values());
+    coverage.extend(conflicts);
 }
 fn sort_coverage(coverage: &mut [Coverage]) {
     coverage.sort_by(|left, right| {

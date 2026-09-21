@@ -125,14 +125,6 @@ fn remote_raw_authority_boundaries_remain_unchecked_or_invalid() {
 
 #[test]
 fn expansion_is_single_pass_and_runtime_fields_stay_opaque() {
-    assert_eq!(
-        agent_plugin_lint::expand_once_for_test(
-            "${PLUGIN_ROOT}${PLUGIN_ROOT}${UNKNOWN}",
-            "${PLUGIN_DATA}",
-            "D"
-        ),
-        "${PLUGIN_DATA}${PLUGIN_DATA}${UNKNOWN}"
-    );
     let temp = fixture(mcp(
         json!({"s":{"type":"stdio","command":"node", "args":["../x", "${PLUGIN_ROOT}"], "env":{"X":"${PLUGIN_DATA}/../x"}, "cwd":"${PLUGIN_DATA}/future"}}),
     ));

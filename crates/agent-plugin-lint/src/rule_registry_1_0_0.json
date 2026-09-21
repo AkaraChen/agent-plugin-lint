@@ -1,0 +1,730 @@
+[
+  {
+    "id": "AP-MANIFEST-LOCATION",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1(2), §5.1 L61,133–137"
+  },
+  {
+    "id": "AP-MANIFEST-JSON",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.2 L143,147"
+  },
+  {
+    "id": "AP-MANIFEST-UNKNOWN-FIELD",
+    "radius": "ignored",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.2, §11.3 L143–147,546"
+  },
+  {
+    "id": "AP-MANIFEST-REQUIRED",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.3 L191–196"
+  },
+  {
+    "id": "AP-MANIFEST-SCHEMA-ID",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.2 L151–153"
+  },
+  {
+    "id": "AP-MANIFEST-METADATA-TYPE",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.2, §5.4 L147,200–212"
+  },
+  {
+    "id": "AP-MANIFEST-AUTHOR",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.4 L204,210"
+  },
+  {
+    "id": "AP-NAME-LENGTH",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.5 L216–220"
+  },
+  {
+    "id": "AP-NAME-CHARSET",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.5 L216–223"
+  },
+  {
+    "id": "AP-NAME-ENDS",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.5 L222"
+  },
+  {
+    "id": "AP-NAME-REPETITION",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.5 L223"
+  },
+  {
+    "id": "AP-METADATA-NO-FORMAT-REJECTION",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§5.4 L212"
+  },
+  {
+    "id": "AP-VERSION-SEMVER",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "package",
+    "specTable": "§5.4, §10.2 L202,514"
+  },
+  {
+    "id": "AP-LICENSE-SPDX",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "RECOMMENDED",
+    "subject": "package",
+    "specTable": "§5.4 L207"
+  },
+  {
+    "id": "AP-CLIENT-MANIFEST-FIRST",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§5.1, §5.2, §5.3, §11.3 L137,147,196,546"
+  },
+  {
+    "id": "AP-CLIENT-MANIFEST-REPORT",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "client",
+    "specTable": "§5.2, §5.3 L153,196"
+  },
+  {
+    "id": "AP-LOCAL-SCHEMA-SELECTION",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§5.2, §7.2.1 L153,311"
+  },
+  {
+    "id": "AP-PATH-MANIFEST-ESCAPE",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1 L62,98–100"
+  },
+  {
+    "id": "AP-PATH-FIXED-ESCAPE",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1 L62,101"
+  },
+  {
+    "id": "AP-PATH-SKILL-ESCAPE",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1, §7.1 L62,102,281"
+  },
+  {
+    "id": "AP-PATH-SERVER-ESCAPE",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1, §7.2.1 L63,103,337"
+  },
+  {
+    "id": "AP-PATH-RESOURCE-ESCAPE",
+    "radius": "ignored",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1 L62,104"
+  },
+  {
+    "id": "AP-PATH-RELATIVE-FORM",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§4.1 L63；§7.2.1 L325,331–337"
+  },
+  {
+    "id": "AP-PATH-OPAQUE-VALUES",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§4.1 L64；§9.2 L475"
+  },
+  {
+    "id": "AP-PATH-NARROWEST-BOUNDARY",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§4.1 L98–104"
+  },
+  {
+    "id": "AP-DISCOVERY-FIXED",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§6.1, §7.2.1, §7.2.2 L241–248,303,395"
+  },
+  {
+    "id": "AP-DISCOVERY-MISSING",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§6.2 L263"
+  },
+  {
+    "id": "AP-DISCOVERY-KIND",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§6.2 L265"
+  },
+  {
+    "id": "AP-DISCOVERY-SKILL-EXACT",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.1 L281"
+  },
+  {
+    "id": "AP-DISCOVERY-UNSUPPORTED",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7, §11.3 L271–273,545,548"
+  },
+  {
+    "id": "AP-ADVICE-UNDISCOVERED-SKILL",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "§7.1 L281（工具提示）"
+  },
+  {
+    "id": "AP-ADVICE-UNRESOLVED-PATH",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "§4.1（工具可见性）"
+  },
+  {
+    "id": "AP-SKILL-CONFORMANCE",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.1 L277,283"
+  },
+  {
+    "id": "AS-FRONTMATTER",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.1 → AS SKILL.md format"
+  },
+  {
+    "id": "AS-NAME",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.1 → AS name"
+  },
+  {
+    "id": "AS-DESCRIPTION",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.1 → AS description"
+  },
+  {
+    "id": "AS-OPTIONAL-FIELDS",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.1 → AS frontmatter/compatibility/metadata"
+  },
+  {
+    "id": "AS-DESCRIPTION-QUALITY",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "package",
+    "specTable": "§7.1 → AS description 建议"
+  },
+  {
+    "id": "AS-SIZE-GUIDANCE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "RECOMMENDED",
+    "subject": "package",
+    "specTable": "§7.1 → AS Progressive disclosure 建议"
+  },
+  {
+    "id": "AP-CLIENT-SKILL-REPORT",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "client",
+    "specTable": "§7.1 L283"
+  },
+  {
+    "id": "AP-ADVICE-SKILLS-UNCHECKED",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "§7.1（工具覆盖提示）"
+  },
+  {
+    "id": "AP-MCP-ENVELOPE",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1–7.2.2 L305,396"
+  },
+  {
+    "id": "AP-MCP-SCHEMA-ID",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L309,311；§7.2.2 L396"
+  },
+  {
+    "id": "AP-MCP-VERSION-MATCH",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.2, §10.1 L396,508"
+  },
+  {
+    "id": "AP-MCP-SERVER-VARIANT",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L305,313–347"
+  },
+  {
+    "id": "AP-MCP-COMMAND",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L325"
+  },
+  {
+    "id": "AP-MCP-BUNDLED-COMMAND",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L327"
+  },
+  {
+    "id": "AP-MCP-PATH-DEPENDENCE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L327"
+  },
+  {
+    "id": "AP-MCP-CWD-FORM",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L331–337"
+  },
+  {
+    "id": "AP-MCP-URL",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L351"
+  },
+  {
+    "id": "AP-MCP-HTTPS",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L351"
+  },
+  {
+    "id": "AP-MCP-HEADERS",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L353"
+  },
+  {
+    "id": "AP-MCP-HEADER-SECRETS",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§7.2.1 L355；§7.2.2 L397"
+  },
+  {
+    "id": "AP-MCP-ENV-SECRETS",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§9.2 L479；§7.2.2 L397"
+  },
+  {
+    "id": "AP-MCP-RESERVED-ENV",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§9.2 L481"
+  },
+  {
+    "id": "AP-ADVICE-POSSIBLE-SECRET",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "§7.2.1, §9.2（启发式）"
+  },
+  {
+    "id": "AP-ADVICE-AMBIGUOUS-COMMAND",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "§7.2.1 L325（语法欠定）"
+  },
+  {
+    "id": "AP-ADVICE-ENV-CASE",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "§9.1–9.2 L460,481（平台差异）"
+  },
+  {
+    "id": "AP-CLIENT-COMMAND-RESOLUTION",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1 L325,329"
+  },
+  {
+    "id": "AP-CLIENT-CWD",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1 L331,337,339"
+  },
+  {
+    "id": "AP-CLIENT-REMOTE-LITERALS",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1 L353"
+  },
+  {
+    "id": "AP-CLIENT-HEADER-PRECEDENCE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1 L355"
+  },
+  {
+    "id": "AP-CLIENT-HEADER-REDIRECT",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1 L355"
+  },
+  {
+    "id": "AP-CLIENT-TRANSPORT-MINIMUM",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1, §11.1 L361,534"
+  },
+  {
+    "id": "AP-CLIENT-TRANSPORT-BOTH",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "client",
+    "specTable": "§7.2.1 L361"
+  },
+  {
+    "id": "AP-CLIENT-TRANSPORT-INITIAL",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1 L361"
+  },
+  {
+    "id": "AP-CLIENT-MCP-CONFIG-BOUNDARY",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.2 L396"
+  },
+  {
+    "id": "AP-CLIENT-MCP-ENTRY-BOUNDARY",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.2 L397"
+  },
+  {
+    "id": "AP-CLIENT-MCP-UNSUPPORTED",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.2, §11.3 L398,548"
+  },
+  {
+    "id": "AP-CLIENT-MCP-CONNECTION",
+    "radius": "component",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.2 L399"
+  },
+  {
+    "id": "AP-CLIENT-MCP-REPORT",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "client",
+    "specTable": "§7.2.2 L396–399"
+  },
+  {
+    "id": "AP-EXTENSIONS-OBJECT",
+    "radius": "ignored",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§5.2, §8.1, §11.3 L147,411,427,546"
+  },
+  {
+    "id": "AP-EXTENSION-NAMESPACE",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§8, §8.1 L403,411"
+  },
+  {
+    "id": "AP-EXTENSION-VALUE",
+    "radius": "ignored",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§8.1 L411,427；§11.1 L532"
+  },
+  {
+    "id": "AP-EXTENSION-UNKNOWN",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§8.1, §11.1 L427,532"
+  },
+  {
+    "id": "AP-EXTENSION-FILE-LOCATION",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§8, §8.2 L403,431,446"
+  },
+  {
+    "id": "AP-EXTENSION-CLIENT-DISCOVERY",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§8.2 L446"
+  },
+  {
+    "id": "AP-EXTENSION-DOMAIN-CONTROL",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "publisher",
+    "specTable": "§8 L405"
+  },
+  {
+    "id": "AP-EXTENSION-STABILITY",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "publisher",
+    "specTable": "§8 L405"
+  },
+  {
+    "id": "AP-CLIENT-ENV-ROOTS",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§9.1, §9.2 L454,481"
+  },
+  {
+    "id": "AP-CLIENT-DATA-LIFECYCLE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§9.1 L456"
+  },
+  {
+    "id": "AP-CLIENT-ENV-OVERLAY",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§9.1 L460"
+  },
+  {
+    "id": "AP-ENV-BASE-DEPENDENCE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "package",
+    "specTable": "§9.1 L462"
+  },
+  {
+    "id": "AP-EXPANSION-SINGLE-PASS",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§7.2.1, §9.2 L339,473–475"
+  },
+  {
+    "id": "AP-EXPANSION-LITERAL",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§9.2 L477"
+  },
+  {
+    "id": "AP-RELEASE-SCHEMA-PAIR",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "publisher",
+    "specTable": "§10.1 L506"
+  },
+  {
+    "id": "AP-RELEASE-SCHEMA-IMMUTABLE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "publisher",
+    "specTable": "§10.1 L510"
+  },
+  {
+    "id": "AP-CLIENT-CONFORMANCE",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§1, §11.1 L32,528–537"
+  },
+  {
+    "id": "AP-CLIENT-FAILURE-ISOLATION",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "MUST",
+    "subject": "client",
+    "specTable": "§11.3 L547"
+  },
+  {
+    "id": "AP-CLIENT-FAILURE-REPORT",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "subject": "client",
+    "specTable": "§11.3 L548"
+  },
+  {
+    "id": "AP-ADVICE-DUPLICATE-JSON-KEY",
+    "radius": "advisory",
+    "normative": false,
+    "obligation": "NONE",
+    "subject": "package",
+    "specTable": "工具策略（AP未明定）"
+  }
+]

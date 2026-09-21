@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "离线、只读的 Agent Skills 校验库"
+include = ["src/**", "LICENSE", "MIGRATION.md", "Cargo.toml"]
 
 [dependencies]
 serde.workspace = true
