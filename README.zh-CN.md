@@ -7,7 +7,7 @@
 	<a href="#许可证"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
 
-帮助 [Agent Plugins 1.0.0](https://agent-plugins.org) 插件作者在分发前发现配置错误和包内路径越界的命令行检查工具。
+用于 [Agent Plugins](https://agent-plugins.org) 的命令行 linter，可检查多种问题。
 
 检查范围：
 
