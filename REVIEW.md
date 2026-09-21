@@ -36,3 +36,9 @@ astra 独立执行 workspace test（10 个测试通过）和 clippy（无警告�
 S1 第二轮：astra 再跑 20 个集成测试和 clippy 通过；六个旧复现已修复。新增复现仍有两失败：布尔 metadata 键被字符串化；frontmatter unchecked 后字段仍 pass。独立最小依赖实验确认 `deserialize_any` 可严格区分数值/布尔键与带引号或 `!!str` 的字符串键；退回 terra 移除手写事件补丁并修正 coverage。仍未接受 S1。
 
 S1 第三轮接受：astra 独立执行 `cargo test --workspace`（23 个集成测试通过）、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --all -- --check`、`git diff --check`。另将最初未改动的 6 个 probes 和后续 2 个失败 probes + 1 个依赖实验重新加入临时测试并执行，9/9 通过后移除临时文件。已核对 `deserialize_any` 严格键类型、解析未完成时 dependent coverage=blocked、全文件行数、合法链接、非 UTF-8 路径与原类型错误修复。常规 Unicode/NFKC、未知字段、重复/非字符串 YAML 键仍明确 unchecked；token 预算 manual，位置不猜测。AP §7.1 引用 AS 格式要求；范围不包含完整宿主加载。
+
+## S2a：manifest 纯库
+
+两次旧执行会话提前停止后，换新 terra 会话继续同片。astra 独立执行 34 个集成测试和 clippy 通过；核对 §5.2 两个非 fatal 例外、§5.3 required 抑制、§5.4 类型与禁止格式拒绝、§5.5 名称、§10.2 SemVer 建议、§8.1 未知扩展不定罪。两份内嵌 schema 与研究快照字节、固定 SHA-256 均通过。独立 11 个 probes 有 9 pass、2 fail（obligation 大小写和 rule ID 字典序），已退回修复输出契约，尚未接受此片。
+
+S2a 修订接受：astra 重跑 workspace 的 36 个集成测试、clippy、fmt，均通过；独立 11 probes 原样复验全过。输出 obligation 大写、finding 按序列化 rule ID 字典序排序、manifest 专用规则集合隔离已核实。两份内嵌 schema 再次与研究快照逐字节及 SHA-256 核对一致。此片仅纯库，没有声称 CLI/文件系统/组件检查已执行。

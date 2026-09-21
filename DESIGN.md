@@ -120,7 +120,8 @@ extensions 非对象 ignored；unknown namespace value 整体不检查（§8.1�
 | 切片 | terra 实现范围 | astra 必须独立验证 |
 |---|---|---|
 | S1 | skill 库完整移植、结构化诊断、两 bug、YAML 后端 | 原有 parser/validator/prompt 测试的语义迁移；400 汉字、1024/1025、metadata、字符 name/compatibility、frontmatter/类型/未知字段 |
-| S2 | report/CLI/vendor/manifest | cargo test/clippy；§5.2 两例外、author、name、metadata 禁误报、退出码/JSON 稳定 |
+| S2a | report/rules/vendor/manifest 纯库 | cargo test/clippy；§5.2 两例外、author、name、metadata 禁误报 |
+| S2b | CLI、文件读取门禁、报告汇总 | cargo test/clippy；退出码、参数、发现入口、JSON 稳定 |
 | S3 | discovery/containment/skill 编排 | cargo test/clippy；§4.1 全边界、link/..、循环、内部链接、真实 3 条 symlink |
 | S4 | MCP、expansion | cargo test/clippy；三 variant 矩阵、envelope/entry 隔离、URL/header/cwd/env、不回显值 |
 | S5 | extensions、收口文档/覆盖 | cargo test/clippy；§8 未知 value 不检及独立存在；真实语料、离线/只读检查、完整验证记录 |
