@@ -1,6 +1,6 @@
 # Agent Plugins 1.0.0 规则总表
 
-本表复用前轮 91 个规则 ID、失败半径、正反例及 RFC2119 原文索引；已决事项以 DECISIONS.md 为唯一真源。Rust 结构与执行契约见 DESIGN.md，实际验证状态见 REVIEW.md；表项不等于已实现。待决边缘按保守未检查策略处理。
+本表复用前轮 91 个规则 ID、失败半径、正反例及 RFC2119 原文索引；已决事项以 DECISIONS.md 为唯一真源。Rust 结构与执行契约见 DESIGN.md，实际验证状态见 REVIEW.md；表项不等于已实现。欠定边缘按已定D3/D5/D6的保守未检查策略处理。
 
 ## 阅读约定
 
@@ -110,8 +110,8 @@ AP §7.1 将格式要求交给 Agent Skills。本轮冻结 research/agent-skills
 | rule id | spec §（原文行） | 失败半径 | 是否 normative / obligation；主体/检测 | 检测方法（含边界） | 正例 | 反例 |
 |---|---|---|---|---|---|---|
 | AP-EXTENSIONS-OBJECT | §5.2, §8.1, §11.3 L147,411,427,546 | ignored | true/MUST；P/S | extensions非对象（含null/数组）报告并忽略整个字段，仍加载有效组件。这是第二个非fatal例外。 | extensions:{} | extensions:[] |
-| AP-EXTENSION-NAMESPACE | §8, §8.1 L403,411 | fatal | true/MUST；P/S | namespace要reverse-domain；仅明确非法时使用fatal，语法边缘待决；空名或含路径分隔符明确不构成reverse-domain。标签数和完整语法未在本地正文定义，schema正文已核实但未定义 namespace 正则，无点/空段/IDN/大小写/下划线等暂不强判，记未评估；不能查DNS证明控制权。 | com.openai | ""；../x（example/com..x暂列未评估） |
-| AP-EXTENSION-VALUE | §8.1 L411,427；§11.1 L532 | ignored | true/MUST；P/M | 本行ignored是待决提案，非已裁定的规范半径。包结构要求每value为对象，与忽略未知value不验证的client要求存在解释空间。v1不实现namespace，故不检查未知value，记unchecked-by-design；人工确认非对象可记录包侧不合规，半径未获规范明确裁决，不得自动升级fatal。 | com.x:{} | com.x:3（作者侧要求不符，客户端处理待澄清） |
+| AP-EXTENSION-NAMESPACE | §8, §8.1 L403,411 | fatal | true/MUST；P/S | namespace要reverse-domain；仅明确非法时使用fatal，语法边缘按D3定案未检查；空名或含路径分隔符明确不构成reverse-domain。标签数和完整语法未在本地正文定义，schema正文已核实但未定义 namespace 正则，无点/空段/IDN/大小写/下划线等暂不强判，记未评估；不能查DNS证明控制权。 | com.openai | ""；../x（example/com..x暂列未评估） |
+| AP-EXTENSION-VALUE | §8.1 L411,427；§11.1 L532 | ignored | true/MUST；P/M | 本行ignored保留历史规则索引，不作为未知namespace的实际判罚。D3已定案：未知value不检查、不据此判作者侧违规。包结构要求每value为对象，与忽略未知value不验证的client要求存在解释空间。v1不实现namespace，故不检查未知value，记unchecked-by-design；人工确认非对象可记录包侧不合规，半径未获规范明确裁决，不得自动升级fatal。 | com.x:{} | com.x:3（作者侧要求不符，客户端处理待澄清） |
 | AP-EXTENSION-UNKNOWN | §8.1, §11.1 L427,532 | advisory | true/MUST；C/T | 不实现的namespace值整体不解释/不检查内容，不运行私有校验器；顶层extensions类型与namespace键仍处理。 | 未知namespace含任意对象内容不报错 | 遍历com.openai.interface并要求自定字段 |
 | AP-EXTENSION-FILE-LOCATION | §8, §8.2 L403,431,446 | advisory | true/MUST；P/M | 已确认某文件属于某扩展时应在同名顶层目录；未知文件不凭目录名推断意图。规范未给通用包失败半径；client文件发现行为另测。manifest数据和目录可各自独立。 | 仅com.x/；仅extensions.com.x | 已声明使用com.x的file行为却从其他目录取该扩展 |
 | AP-EXTENSION-CLIENT-DISCOVERY | §8.2 L446 | advisory | true/MUST；C/T | 实现某namespace的file行为才去对应顶层目录；没有目录不自动报错。 | 实现com.x→查R/com.x | 从R/private/com.x发现同一file扩展 |
@@ -229,4 +229,4 @@ AP §7.1 将格式要求交给 Agent Skills。本轮冻结 research/agent-skills
 | AP-EXTENSION-*、AP-EXTENSIONS-* | agent-plugin-lint / manifest | 未实现 namespace 不读 value；不强制数据/目录成对 | S5 |
 | AP-CLIENT-*、AP-RELEASE-*、人工规则 | report / coverage 与开发测试 | 适用的模拟契约写测试，其余 Manual/Runtime；不伪报通过 | 各片 |
 
-91 条 ID 保持不变。代码元数据测试应核对 ID 与表的映射；每条具体规则的执行状态在 coverage 或验证记录中呈现。默认政策 D4 暂按确定 normative MUST 包违规返回 1（含 ignored）；D3/D5/D6 保守未检查；待决身份不改变。
+91 条 ID 保持不变。代码元数据测试应核对 ID 与表的映射；每条具体规则的执行状态在 coverage 或验证记录中呈现。默认政策 D4 已定：确定 normative MUST 包违规返回 1（含 ignored）；D3/D5/D6 已定保守未检查。本文解释以DECISIONS.md追加定案为准。

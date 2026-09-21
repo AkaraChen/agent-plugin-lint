@@ -81,7 +81,7 @@ Report 字段：schemaVersion=1、toolVersion、rulesetVersion、specVersion=1.0
 
 排序：plugin root；finding 按 path/pointer/ruleId/scope/effect；coverage 按 ruleId/target/status；errors 按 path/code。无时间戳。同一输入、平台、版本 JSON 两次运行逐字节相同。稳定消费者依赖枚举、ID、证据码，不能解析人类消息。规范解释变化升 rulesetVersion。
 
-D4 尚待飞鸢正式裁决，本轮可审阅默认：确定的包侧 normative MUST 全部使退出 1，包含 ignored；只有 advisory 返回 0。`--strict` 额外拦截 advisory 与选定静态规则的 unchecked；manual/runtime/not-applicable/blocked 不因本身导致失败。末尾 registry 中没有目标级执行记录的包侧条目标 `unchecked/RULE_NOT_EVALUATED`，不能据缺记录推断目标不存在。这类索引占位未纳入 strict 的选择；具体目标上的静态 unchecked 仍纳入，不能用占位例外掩盖实际能力缺口。这只是 CI 政策，不提升半径。无找到包、IO/参数/歧义返回 2。
+D4 已于2026-09-21定案：确定的包侧 normative MUST 全部使退出 1，包含 ignored；只有 advisory 返回 0。`--strict` 额外拦截 advisory 与选定静态规则的 unchecked；manual/runtime/not-applicable/blocked 不因本身导致失败。末尾 registry 中没有目标级执行记录的包侧条目标 `unchecked/RULE_NOT_EVALUATED`，不能据缺记录推断目标不存在。这类索引占位未纳入 strict 的选择；具体目标上的静态 unchecked 仍纳入，不能用占位例外掩盖实际能力缺口。这只是 CI 政策，不提升半径。无找到包、IO/参数/歧义返回 2。
 
 ## 5. manifest 与目录发现
 
@@ -131,8 +131,8 @@ extensions 非对象 ignored；unknown namespace value 整体不检查（§8.1�
 
 真实靶子 HEAD 见 research/PROVENANCE.md。期望 11 plugin、24 skill 候选、0 MCP；两 references 逃逸 ignored/deny-path，guided-review 逃逸 component/skip-skill，共三条确定路径逃逸。若新 HEAD 语料变化先如实记录，不修改它来迎合预期。最终报告区分源码树、安装产物、MCP 静态配置与真实连接；未启动服务不能称连接验过。
 
-## 9. 待飞鸢裁决与非目标
+## 9. 已定策略与非目标
 
-D2′ 结构化接口由本设计落地，发布稳定性仍需 review。D3 unknown extension value 的作者侧合规裁决；D4 默认 ignored MUST 退出 1；D5 token/loopback/env 大小写接受域；D6 无版本 AS 快照及 Unicode/NFKC 裁决；D7 宿主矩阵与二进制/crates/skill 发行范围；D8 支持平台承诺。当前保守实现不将这些待决解释伪称已拍板。
+D2′ 结构化接口已落地。D3–D8 已按 DECISIONS.md 追加定案：未知 namespace value 不检、不据此判作者违规；默认 ignored MUST 退出1；token/loopback/env大小写欠定形态保持unchecked或advisory并由strict拦截；AS日期快照与Unicode保守策略不变；L6不进v1，发行目标是clone后cargo build；三平台须各自在CI实测，Windows全绿前不宣称支持。平台已验范围与具体降级见最新REVIEW记录，不用Linux结果替代其他平台。
 
 本轮范围包含可运行引擎与 public 源码仓库，不含 crates.io 发布、宿主矩阵、SARIF、--fix、旧库归档、改 eric-way 或安装测试。Linux 实测范围以 REVIEW.md 为准。

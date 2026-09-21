@@ -11,8 +11,12 @@ pub enum Resolution {
 
 /// Canonicalize the unmodified path: `link/..` must be left for the kernel.
 pub fn resolve(root: &Path, path: &Path) -> io::Result<Resolution> {
+    // Resolve the boundary at this operation's entry.  Comparing a resolved
+    // path to the caller's spelling of the root is wrong for aliases such as
+    // `/var` -> `/private/var` and Windows extended-length paths.
+    let root = fs::canonicalize(root)?;
     match fs::canonicalize(path) {
-        Ok(actual) if actual.starts_with(root) => Ok(Resolution::Inside(actual)),
+        Ok(actual) if actual.starts_with(&root) => Ok(Resolution::Inside(actual)),
         Ok(_) => Ok(Resolution::Outside),
         Err(error) if unresolved(&error) => Ok(Resolution::Unresolved),
         Err(error) => Err(error),
@@ -84,8 +88,12 @@ fn identity(metadata: &fs::Metadata) -> Identity {
 /// O_NONBLOCK so a FIFO substitution cannot block. This is change detection,
 /// not an atomic filesystem sandbox; non-Unix identity is necessarily weaker.
 pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
+    // Keep this resolved boundary for the whole operation.  In particular, do
+    // not resolve the root again after a hook/open: a replacement at its
+    // original spelling must not make a new directory an accepted boundary.
+    let root = fs::canonicalize(root)?;
     let before_path = fs::canonicalize(path)?;
-    if !before_path.starts_with(root) {
+    if !before_path.starts_with(&root) {
         return Err(ReadError::Unsafe);
     }
     let before_metadata = fs::metadata(&before_path)?;
@@ -111,7 +119,7 @@ pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
     test_hook(HookPoint::AfterRead);
     let handle_after = file.metadata()?;
     let after_path = fs::canonicalize(path).map_err(|_| ReadError::InputChanged)?;
-    if after_path != before_path || !after_path.starts_with(root) {
+    if after_path != before_path || !after_path.starts_with(&root) {
         return Err(ReadError::InputChanged);
     }
     let after_metadata = fs::metadata(&after_path).map_err(|_| ReadError::InputChanged)?;
@@ -151,7 +159,11 @@ type TestHook = Box<dyn Fn(HookPoint) + Send + Sync>;
 static TEST_HOOK: std::sync::Mutex<Option<TestHook>> = std::sync::Mutex::new(None);
 #[cfg(test)]
 fn test_hook(point: HookPoint) {
-    if let Some(hook) = TEST_HOOK.lock().expect("hook mutex poisoned").as_ref() {
+    if let Some(hook) = TEST_HOOK
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+    {
         hook(point);
     }
 }
@@ -168,15 +180,24 @@ mod tests {
     use tempfile::TempDir;
 
     static TEST_SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
-    fn with_hook(f: impl Fn(HookPoint) + Send + Sync + 'static) {
-        *TEST_HOOK.lock().unwrap() = Some(Box::new(f));
+    fn unpoisoned_lock<T>(mutex: &std::sync::Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+        mutex
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
-    fn clear_hook() {
-        *TEST_HOOK.lock().unwrap() = None;
+    struct HookGuard;
+    impl Drop for HookGuard {
+        fn drop(&mut self) {
+            *unpoisoned_lock(&TEST_HOOK) = None;
+        }
+    }
+    fn with_hook(f: impl Fn(HookPoint) + Send + Sync + 'static) -> HookGuard {
+        *unpoisoned_lock(&TEST_HOOK) = Some(Box::new(f));
+        HookGuard
     }
     #[test]
     fn detects_replaced_path_and_changed_contents() {
-        let _serial = TEST_SERIAL.lock().unwrap();
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
         let temp = TempDir::new().unwrap();
         let root = temp.path();
         let file = root.join("x");
@@ -184,7 +205,7 @@ mod tests {
         let swapped = Arc::new(AtomicBool::new(false));
         let copy = file.clone();
         let flag = swapped.clone();
-        with_hook(move |point| {
+        let hook = with_hook(move |point| {
             if matches!(point, HookPoint::BeforeOpen) && !flag.swap(true, Ordering::SeqCst) {
                 fs::remove_file(&copy).unwrap();
                 fs::write(&copy, "two longer").unwrap();
@@ -194,9 +215,9 @@ mod tests {
             read_safe(root, &file),
             Err(ReadError::InputChanged)
         ));
-        clear_hook();
+        drop(hook);
         let copy = file.clone();
-        with_hook(move |point| {
+        let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::AfterRead) {
                 fs::write(&copy, "changed content").unwrap();
             }
@@ -205,12 +226,33 @@ mod tests {
             read_safe(root, &file),
             Err(ReadError::InputChanged)
         ));
-        clear_hook();
+    }
+    #[test]
+    fn reads_ordinary_file() {
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let file = temp.path().join("x");
+        fs::write(&file, "ordinary").unwrap();
+        assert_eq!(read_safe(temp.path(), &file).unwrap(), "ordinary");
+    }
+    #[cfg(unix)]
+    #[test]
+    fn reads_through_root_alias() {
+        use std::os::unix::fs::symlink;
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let root = temp.path().join("root");
+        fs::create_dir(&root).unwrap();
+        let file = root.join("x");
+        fs::write(&file, "ordinary").unwrap();
+        let alias = temp.path().join("alias");
+        symlink(&root, &alias).unwrap();
+        assert_eq!(read_safe(&alias, &file).unwrap(), "ordinary");
     }
     #[cfg(unix)]
     #[test]
     fn detects_link_target_change() {
-        let _serial = TEST_SERIAL.lock().unwrap();
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
         use std::os::unix::fs::symlink;
         let temp = TempDir::new().unwrap();
         let root = temp.path();
@@ -219,7 +261,7 @@ mod tests {
         let link = root.join("link");
         symlink("one", &link).unwrap();
         let copy = link.clone();
-        with_hook(move |point| {
+        let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::BeforeOpen) {
                 fs::remove_file(&copy).unwrap();
                 symlink("two", &copy).unwrap();
@@ -229,12 +271,39 @@ mod tests {
             read_safe(root, &link),
             Err(ReadError::InputChanged)
         ));
-        clear_hook();
+    }
+    #[cfg(unix)]
+    #[test]
+    fn rejects_root_rebound_during_read() {
+        use std::os::unix::fs::symlink;
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let old = temp.path().join("old");
+        let new = temp.path().join("new");
+        fs::create_dir(&old).unwrap();
+        fs::create_dir(&new).unwrap();
+        fs::write(old.join("x"), "old").unwrap();
+        fs::write(new.join("x"), "new content").unwrap();
+        let root = temp.path().join("root");
+        symlink(&old, &root).unwrap();
+        let path = root.join("x");
+        let root_copy = root.clone();
+        let new_copy = new.clone();
+        let _hook = with_hook(move |point| {
+            if matches!(point, HookPoint::BeforeOpen) {
+                fs::remove_file(&root_copy).unwrap();
+                symlink(&new_copy, &root_copy).unwrap();
+            }
+        });
+        assert!(matches!(
+            read_safe(&root, &path),
+            Err(ReadError::InputChanged)
+        ));
     }
     #[cfg(unix)]
     #[test]
     fn fifo_is_never_read_blocking() {
-        let _serial = TEST_SERIAL.lock().unwrap();
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
         use std::os::unix::fs::FileTypeExt;
         let temp = TempDir::new().unwrap();
         let fifo = temp.path().join("fifo");
@@ -254,12 +323,12 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn fifo_substitution_is_input_changed_and_nonblocking() {
-        let _serial = TEST_SERIAL.lock().unwrap();
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
         let temp = TempDir::new().unwrap();
         let file = temp.path().join("file");
         fs::write(&file, "ordinary").unwrap();
         let copy = file.clone();
-        with_hook(move |point| {
+        let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::BeforeOpen) {
                 fs::remove_file(&copy).unwrap();
                 assert!(
@@ -275,6 +344,5 @@ mod tests {
             read_safe(temp.path(), &file),
             Err(ReadError::InputChanged)
         ));
-        clear_hook();
     }
 }
