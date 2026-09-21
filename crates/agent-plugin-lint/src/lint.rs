@@ -440,7 +440,7 @@ fn from_validation(
     PluginOutcome { plugin, errors }
 }
 
-fn add_finding(
+pub(crate) fn add_finding(
     plugin: &mut PluginReport,
     rule: RuleId,
     path: String,
@@ -469,74 +469,39 @@ fn add_finding(
     });
 }
 
+pub(crate) fn add_finding_pointer(
+    plugin: &mut PluginReport,
+    rule: RuleId,
+    path: String,
+    scope: Scope,
+    pointer: Option<String>,
+    code: &str,
+    message: &str,
+) {
+    let meta = rule.metadata();
+    plugin.findings.push(Finding {
+        rule_id: rule,
+        spec: meta.spec.iter().map(|x| (*x).into()).collect(),
+        radius: meta.radius,
+        normative: meta.normative,
+        obligation: meta.obligation,
+        subject: meta.subject,
+        confidence: meta.confidence,
+        path,
+        pointer,
+        line: None,
+        column: None,
+        scope,
+        effect: meta.effect,
+        evidence_code: code.into(),
+        message: message.into(),
+        hint: None,
+    });
+}
+
 fn scan_components(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>) {
     scan_skills(root, plugin, errors);
-    // S4 owns parsing and server validation.  Presence is intentionally not a
-    // component failure in S3; a bad kind is still a §6.2 fact.
-    let mcp = root.join("mcp.json");
-    match fs::symlink_metadata(&mcp) {
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => plugin.coverage.push(Coverage {
-            rule_id: RuleId::McpEnvelope.as_str().into(),
-            target: "mcp.json".into(),
-            status: CoverageStatus::NotApplicable,
-            reason_code: Some("MCP_ABSENT".into()),
-        }),
-        Err(_) => {
-            error(errors, &mcp, "MCP_METADATA_IO", "无法读取 mcp.json 元数据");
-            plugin.coverage.push(Coverage {
-                rule_id: RuleId::McpEnvelope.as_str().into(),
-                target: "mcp.json".into(),
-                status: CoverageStatus::Unchecked,
-                reason_code: Some("MCP_METADATA_IO".into()),
-            });
-        }
-        Ok(_) => match crate::containment::resolve(root, &mcp) {
-            Ok(crate::containment::Resolution::Inside(actual)) => {
-                match crate::containment::regular(&actual) {
-                    Ok(true) => plugin.coverage.push(Coverage {
-                        rule_id: RuleId::McpEnvelope.as_str().into(),
-                        target: "mcp.json".into(),
-                        status: CoverageStatus::Unchecked,
-                        reason_code: Some("NOT_IMPLEMENTED_S3".into()),
-                    }),
-                    Ok(false) => add_finding(
-                        plugin,
-                        RuleId::DiscoveryKind,
-                        "mcp.json".into(),
-                        Scope::ComponentType("mcp".into()),
-                        "MCP_WRONG_KIND",
-                        "mcp.json 必须是普通文件，已禁用 MCP 组件",
-                    ),
-                    Err(_) => {
-                        error(errors, &mcp, "MCP_METADATA_IO", "无法读取 mcp.json 元数据");
-                        plugin.coverage.push(Coverage {
-                            rule_id: RuleId::McpEnvelope.as_str().into(),
-                            target: "mcp.json".into(),
-                            status: CoverageStatus::Unchecked,
-                            reason_code: Some("MCP_METADATA_IO".into()),
-                        })
-                    }
-                }
-            }
-            Ok(crate::containment::Resolution::Outside) => add_finding(
-                plugin,
-                RuleId::PathFixedEscape,
-                "mcp.json".into(),
-                Scope::ComponentType("mcp".into()),
-                "MCP_OUTSIDE_ROOT",
-                "mcp.json 位于包根之外，已禁用 MCP 组件",
-            ),
-            Ok(crate::containment::Resolution::Unresolved) => add_finding(
-                plugin,
-                RuleId::DiscoveryKind,
-                "mcp.json".into(),
-                Scope::ComponentType("mcp".into()),
-                "MCP_UNRESOLVED",
-                "mcp.json 无法解析为普通文件，已禁用 MCP 组件",
-            ),
-            Err(_) => error(errors, &mcp, "MCP_CANONICALIZE", "无法解析 mcp.json"),
-        },
-    }
+    crate::mcp::scan(root, plugin, errors);
 }
 
 fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>) {
@@ -1161,7 +1126,7 @@ fn sort_coverage(coverage: &mut [Coverage]) {
         ))
     });
 }
-fn error(errors: &mut Vec<ToolError>, path: &Path, code: &str, message: &str) {
+pub(crate) fn error(errors: &mut Vec<ToolError>, path: &Path, code: &str, message: &str) {
     errors.push(tool_error(path, code, message));
 }
 fn tool_error(path: &Path, code: &str, message: &str) -> ToolError {

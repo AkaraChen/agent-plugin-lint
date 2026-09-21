@@ -124,7 +124,8 @@ extensions 非对象 ignored；unknown namespace value 整体不检查（§8.1�
 | S2b | CLI、文件读取门禁、报告汇总 | cargo test/clippy；退出码、参数、发现入口、JSON 稳定 |
 | S3 | discovery/containment/skill 编排 | cargo test/clippy；§4.1 全边界、link/..、循环、内部链接、真实 3 条 symlink |
 | S4 | MCP、expansion | cargo test/clippy；三 variant 矩阵、envelope/entry 隔离、URL/header/cwd/env、不回显值 |
-| S5 | extensions、收口文档/覆盖 | cargo test/clippy；§8 未知 value 不检及独立存在；真实语料、离线/只读检查、完整验证记录 |
+| S5a | extensions、JSON 语法/能力与重复键 | cargo test/clippy；§8 未知 value 不检及独立存在；JSON 未检查不误作违规 |
+| S5b | 覆盖清单、CLI/文档/打包收口 | cargo test/clippy；真实语料、离线/只读检查、完整验证记录 |
 
 每片由 astra 验收后才能继续；缺陷退回同一 terra agent 修复。astra 负责提交与推送。每条已选包侧静态规则需要正反例或显式未实现状态；client/publisher/runtime 不能靠假包 fixture 宣称验证。91 条索引不是 91 条可静态证明的规则。
 

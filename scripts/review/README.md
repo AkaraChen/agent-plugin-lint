@@ -11,6 +11,8 @@ python3 scripts/review/filesystem.py full
 python3 scripts/review/s2b.py
 python3 scripts/review/skills.py
 python3 scripts/review/mcp.py
+python3 scripts/review/json_edges.py
+python3 scripts/review/extensions.py
 AP_LINT_CORPUS=/path/to/eric-way/plugins python3 scripts/review/cli.py full
 ```
 

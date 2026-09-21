@@ -31,6 +31,19 @@ pub enum RuleId {
     AsSizeGuidance,
     SkillConformance,
     McpEnvelope,
+    McpSchemaId,
+    McpVersionMatch,
+    McpServerVariant,
+    McpCommand,
+    McpCwdForm,
+    PathServerEscape,
+    McpUrl,
+    McpHttps,
+    McpHeaders,
+    McpReservedEnv,
+    AdviceAmbiguousCommand,
+    AdviceEnvCase,
+    AdvicePossibleSecret,
     AdviceDuplicateJsonKey,
 }
 
@@ -76,6 +89,19 @@ impl RuleId {
             Self::AsSizeGuidance => "AS-SIZE-GUIDANCE",
             Self::SkillConformance => "AP-SKILL-CONFORMANCE",
             Self::McpEnvelope => "AP-MCP-ENVELOPE",
+            Self::McpSchemaId => "AP-MCP-SCHEMA-ID",
+            Self::McpVersionMatch => "AP-MCP-VERSION-MATCH",
+            Self::McpServerVariant => "AP-MCP-SERVER-VARIANT",
+            Self::McpCommand => "AP-MCP-COMMAND",
+            Self::McpCwdForm => "AP-MCP-CWD-FORM",
+            Self::PathServerEscape => "AP-PATH-SERVER-ESCAPE",
+            Self::McpUrl => "AP-MCP-URL",
+            Self::McpHttps => "AP-MCP-HTTPS",
+            Self::McpHeaders => "AP-MCP-HEADERS",
+            Self::McpReservedEnv => "AP-MCP-RESERVED-ENV",
+            Self::AdviceAmbiguousCommand => "AP-ADVICE-AMBIGUOUS-COMMAND",
+            Self::AdviceEnvCase => "AP-ADVICE-ENV-CASE",
+            Self::AdvicePossibleSecret => "AP-ADVICE-POSSIBLE-SECRET",
             Self::AdviceDuplicateJsonKey => "AP-ADVICE-DUPLICATE-JSON-KEY",
         }
     }
@@ -270,6 +296,50 @@ impl RuleId {
                 confidence: certain,
                 effect: DisableType,
             },
+            Self::McpSchemaId | Self::McpVersionMatch => RuleMetadata {
+                spec: &["§7.2.2", "§10.1"],
+                radius: Component,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: DisableType,
+            },
+            Self::PathServerEscape => RuleMetadata {
+                spec: &["§4.1", "§7.2.1", "§7.2.2"],
+                radius: Component,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: Effect::SkipServer,
+            },
+            Self::McpServerVariant
+            | Self::McpCommand
+            | Self::McpCwdForm
+            | Self::McpUrl
+            | Self::McpHttps
+            | Self::McpHeaders
+            | Self::McpReservedEnv => RuleMetadata {
+                spec: &["§7.2.1", "§7.2.2"],
+                radius: Component,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: Effect::SkipServer,
+            },
+            Self::AdviceAmbiguousCommand | Self::AdviceEnvCase | Self::AdvicePossibleSecret => {
+                RuleMetadata {
+                    spec: &["§7.2.1", "§9.2"],
+                    radius: Advisory,
+                    normative: false,
+                    obligation: Obligation::None,
+                    subject: package,
+                    confidence: certain,
+                    effect: Advise,
+                }
+            }
             Self::AdviceDuplicateJsonKey => RuleMetadata {
                 spec: &[],
                 radius: Advisory,

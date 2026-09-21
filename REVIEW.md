@@ -64,3 +64,11 @@ S3 读取/IO 修正片：astra 独立执行57个常规测试（另1语料测试�
 JSON收口待修：独立CLI证明未知字段1e400被解析器范围限制误报manifest JSON fatal。独立依赖实验启用arbitrary_precision后，大数通过但真实`$serde_json::private::Number`对象键被改成Number（1/2实验失败），因此不采用仅开feature的修法。S5将采用语法/表示能力分离，能力不足明确未检查；临时实验文件已移除，不计常规测试通过。
 
 S3 接受：astra 最后独立执行62个常规测试、clippy、fmt、build，18个强化skill黑盒全过；显式ignored语料1/1通过。此前21文件系统+6 CLI错误复现及29个已实现规则元数据对照也已通过。确切枚举、句柄身份变化检测、普通文件换FIFO、IO隔离、完整AS适配、建议不提升为MUST、混合可读/不可读skill汇总均已核实。真实语料仍11包、23个AS实际读取target、1个外部skill未读取；精确三条路径/radius/effect通过（§4.1、§6.2、§7.1）。读取不是原子快照；其他平台未测试。JSON数值能力边界仍作为S5已知待修，不声称整个引擎已最终验收。
+
+## S4 首轮：退回
+
+astra 独立执行65个常规测试、clippy、fmt、build通过；42个当前规则元数据对照通过。强化MCP脚本在合法cwd `./` 失败。额外探针发现：相对cwd错误基于进程目录；包内command `./bin/../server` 被词法误拒；空command和无./的bin/server漏检；command权限错误0；percent/hex host无unchecked；空authority被URL解析器修复后放行。已按§4.1、§7.2.1退回，并要求正式集成矩阵、IO贯通及覆盖状态，不接受S4。
+
+S4 第二轮：astra 独立72常规测试+1显式语料、clippy、fmt，以及39 MCP+21 filesystem+18 skills+6 CLI错误黑盒通过；42元数据对照通过。组合探针仍发现./cwd跳过placeholder展开、后续IPv4段hex未标未知、非压缩mappedIPv6被误判HTTPS违规。已按§7.2.1/§9.2与D5保守策略再次退回；读取/脚本通过不代替这些组合判定。
+
+S4 接受：astra 最后独立执行74个常规测试、clippy、fmt、build、42个MCP黑盒、1个显式ignored语料测试，均通过；另重跑command权限错误探针，确认exit2且独立good server仍有实际Pass。之前21filesystem+18skills+6CLI错误及42规则元数据对照已通过。已核对§4.1/§7.2.1–7.2.2配置边界与§9.2单次展开，真实路径、raw authority及非标准IP未检查策略落实。没有运行MCP启动/连接/认证/握手，也未证明任何宿主客户端合规。JSON大数能力与扩展/全表覆盖仍待S5。
