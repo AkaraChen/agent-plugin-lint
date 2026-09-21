@@ -1,6 +1,7 @@
 //! 离线、只读的 Agent Plugins 1.0.0 校验库。
 mod containment;
 mod expansion;
+mod json;
 mod lint;
 mod manifest;
 mod mcp;

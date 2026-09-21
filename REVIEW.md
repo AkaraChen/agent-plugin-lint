@@ -72,3 +72,7 @@ astra 独立执行65个常规测试、clippy、fmt、build通过；42个当前�
 S4 第二轮：astra 独立72常规测试+1显式语料、clippy、fmt，以及39 MCP+21 filesystem+18 skills+6 CLI错误黑盒通过；42元数据对照通过。组合探针仍发现./cwd跳过placeholder展开、后续IPv4段hex未标未知、非压缩mappedIPv6被误判HTTPS违规。已按§7.2.1/§9.2与D5保守策略再次退回；读取/脚本通过不代替这些组合判定。
 
 S4 接受：astra 最后独立执行74个常规测试、clippy、fmt、build、42个MCP黑盒、1个显式ignored语料测试，均通过；另重跑command权限错误探针，确认exit2且独立good server仍有实际Pass。之前21filesystem+18skills+6CLI错误及42规则元数据对照已通过。已核对§4.1/§7.2.1–7.2.2配置边界与§9.2单次展开，真实路径、raw authority及非标准IP未检查策略落实。没有运行MCP启动/连接/认证/握手，也未证明任何宿主客户端合规。JSON大数能力与扩展/全表覆盖仍待S5。
+
+## S5a 接受
+
+astra 独立执行79个常规Rust测试、clippy、fmt、build，以及10 JSON边界+10 extensions+42 MCP+21 filesystem+18 skills+6 CLI错误+25完整CLI黑盒，共132个；显式真实语料ignored测试1/1通过。核对§8/§8.1：未知namespace值不验证，不推断同名目录必须存在；空名/路径分隔符拒绝，其他语法欠定unchecked。JSON语法与表示能力分离，1e400及额外160层合法嵌套探针均exit2而非JSON违规；重复键按最后值检查并仅advisory，strict提升。§5.2与§7.2父级失败门禁保持。过深输入当前提示写“数值”偏窄，S5b改为通用解析器表示能力措辞。

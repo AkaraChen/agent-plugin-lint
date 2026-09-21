@@ -1,5 +1,6 @@
 use crate::containment::{self, ReadError, Resolution};
 use crate::expansion;
+use crate::json::{self, Parsed};
 use crate::lint::{add_finding, add_finding_pointer, error};
 use crate::{Coverage, CoverageStatus, PluginReport, RuleId, Scope, ToolError};
 use http::{HeaderName, HeaderValue};
@@ -69,15 +70,30 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                     );
                 }
                 Ok(true) => match containment::read_safe(root, &path) {
-                    Ok(source) => match serde_json::from_str::<Value>(&source) {
-                        Ok(value) => envelope(root, plugin, errors, value),
-                        Err(_) => disable(
+                    Ok(source) => match json::parse(&source) {
+                        Parsed::Value {
+                            value,
+                            duplicate_keys,
+                        } => {
+                            duplicate_coverage(plugin, duplicate_keys);
+                            envelope(root, plugin, errors, value)
+                        }
+                        Parsed::Syntax => disable(
                             plugin,
                             RuleId::McpEnvelope,
                             None,
                             "MCP_JSON",
                             "mcp.json 不是有效 JSON，已禁用 MCP 组件",
                         ),
+                        Parsed::Representation => {
+                            error(
+                                errors,
+                                &path,
+                                "MCP_JSON_REPRESENTATION",
+                                "mcp.json 的 JSON 数值超出当前解析器表示能力",
+                            );
+                            representation_block(plugin);
+                        }
                     },
                     Err(ReadError::InputChanged) => {
                         error(
@@ -122,6 +138,71 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                 },
             },
         },
+    }
+}
+
+fn representation_block(plugin: &mut PluginReport) {
+    coverage(
+        plugin,
+        RuleId::McpEnvelope,
+        "mcp.json",
+        CoverageStatus::Unchecked,
+        "JSON_REPRESENTATION",
+    );
+    coverage(
+        plugin,
+        RuleId::AdviceDuplicateJsonKey,
+        "mcp.json",
+        CoverageStatus::Unchecked,
+        "JSON_REPRESENTATION",
+    );
+    for rule in [
+        RuleId::McpSchemaId,
+        RuleId::McpVersionMatch,
+        RuleId::McpServerVariant,
+        RuleId::McpCommand,
+        RuleId::McpCwdForm,
+        RuleId::PathServerEscape,
+        RuleId::McpUrl,
+        RuleId::McpHttps,
+        RuleId::McpHeaders,
+        RuleId::McpReservedEnv,
+    ] {
+        coverage(
+            plugin,
+            rule,
+            "mcp.json",
+            CoverageStatus::Blocked,
+            "JSON_REPRESENTATION",
+        );
+    }
+}
+
+fn duplicate_coverage(plugin: &mut PluginReport, duplicate_keys: bool) {
+    coverage(
+        plugin,
+        RuleId::AdviceDuplicateJsonKey,
+        "mcp.json",
+        if duplicate_keys {
+            CoverageStatus::Fail
+        } else {
+            CoverageStatus::Pass
+        },
+        if duplicate_keys {
+            "DUPLICATE_JSON_KEY"
+        } else {
+            "NO_DUPLICATE_JSON_KEY"
+        },
+    );
+    if duplicate_keys {
+        add_finding(
+            plugin,
+            RuleId::AdviceDuplicateJsonKey,
+            "mcp.json".into(),
+            Scope::ComponentType("mcp".into()),
+            "DUPLICATE_JSON_KEY",
+            "JSON 对象存在重复键；后续校验按最后一个值进行",
+        );
     }
 }
 

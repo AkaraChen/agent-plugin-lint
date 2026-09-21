@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::path::PathBuf;
 
 fn main() {
-    let mut args = std::env::args_os().skip(1);
+    let mut args = std::env::args_os().skip(1).peekable();
     let mut path: Option<PathBuf> = None;
     let mut mode: Option<InputMode> = None;
     let mut spec_seen = false;
@@ -27,7 +27,15 @@ fn main() {
             }
             value if value == OsStr::new("--strict") => strict = true,
             value if value == OsStr::new("--mode") => {
-                let next = args.next();
+                // Do not consume a following option as a value.  In particular,
+                // `--mode --json` still has to select structured output.
+                let next = args
+                    .peek()
+                    .filter(|candidate| !starts_with_dash(candidate.as_os_str()))
+                    .cloned();
+                if next.is_some() {
+                    let _ = args.next();
+                }
                 let value = next.as_deref().and_then(OsStr::to_str);
                 let parsed = match value {
                     Some("auto") => Some(InputMode::Auto),

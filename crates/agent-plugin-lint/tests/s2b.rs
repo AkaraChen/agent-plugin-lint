@@ -142,7 +142,7 @@ fn repeated_reports_are_byte_stable() {
 }
 
 #[test]
-fn strict_promotes_the_selected_duplicate_key_unchecked_rule() {
+fn strict_does_not_promote_duplicate_key_check_when_a_document_was_checked() {
     let temp = TempDir::new().unwrap();
     write_manifest(temp.path(), json!({}));
     let report = lint_path(
@@ -152,7 +152,7 @@ fn strict_promotes_the_selected_duplicate_key_unchecked_rule() {
             strict: true,
         },
     );
-    assert_eq!(report.exit_code, 1);
+    assert_eq!(report.exit_code, 0);
 }
 
 #[test]

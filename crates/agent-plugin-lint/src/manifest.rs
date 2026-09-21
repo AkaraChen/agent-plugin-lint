@@ -3,7 +3,7 @@ use serde_json::{Map, Value};
 use std::collections::{BTreeMap, BTreeSet};
 pub const SCHEMA: &str = "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json";
 /// S2a only executes manifest rules; future RuleId variants are not implicitly covered here.
-const MANIFEST_RULES: [RuleId; 13] = [
+const MANIFEST_RULES: [RuleId; 15] = [
     RuleId::ManifestJson,
     RuleId::ManifestUnknownField,
     RuleId::ManifestRequired,
@@ -16,7 +16,9 @@ const MANIFEST_RULES: [RuleId; 13] = [
     RuleId::NameRepetition,
     RuleId::VersionSemver,
     RuleId::ExtensionsObject,
+    RuleId::ExtensionNamespace,
     RuleId::ExtensionUnknown,
+    RuleId::ExtensionFileLocation,
 ];
 pub struct ManifestValidation {
     pub findings: Vec<Finding>,
@@ -24,6 +26,7 @@ pub struct ManifestValidation {
     pub rejected: bool,
     pub name: Option<String>,
     pub declared_spec: Option<String>,
+    pub duplicate_json_keys: Option<bool>,
 }
 
 pub fn validate_manifest(value: &Value) -> ManifestValidation {
@@ -78,6 +81,14 @@ pub fn validate_manifest(value: &Value) -> ManifestValidation {
     validate_extensions(manifest, &mut state);
     validate_version(manifest, &mut state);
     state.finish()
+}
+pub(crate) fn validate_manifest_document(
+    value: &Value,
+    duplicate_json_keys: bool,
+) -> ManifestValidation {
+    let mut validation = validate_manifest(value);
+    validation.duplicate_json_keys = Some(duplicate_json_keys);
+    validation
 }
 pub fn invalid_json_manifest() -> ManifestValidation {
     let mut state = State::default();
@@ -188,6 +199,7 @@ impl State {
             rejected: self.rejected,
             name: self.name,
             declared_spec: self.declared_spec,
+            duplicate_json_keys: None,
         }
     }
 }
@@ -366,7 +378,9 @@ fn validate_author(manifest: &Map<String, Value>, state: &mut State) {
 fn validate_extensions(manifest: &Map<String, Value>, state: &mut State) {
     let Some(extensions) = manifest.get("extensions") else {
         state.not_applicable(RuleId::ExtensionsObject, "FIELD_ABSENT");
+        state.not_applicable(RuleId::ExtensionNamespace, "FIELD_ABSENT");
         state.not_applicable(RuleId::ExtensionUnknown, "FIELD_ABSENT");
+        state.not_applicable(RuleId::ExtensionFileLocation, "FIELD_ABSENT");
         return;
     };
     let Some(namespaces) = extensions.as_object() else {
@@ -377,15 +391,46 @@ fn validate_extensions(manifest: &Map<String, Value>, state: &mut State) {
             "extensions 不是对象，已忽略",
         );
         state.block(RuleId::ExtensionUnknown, "EXTENSIONS_IGNORED");
+        state.block(RuleId::ExtensionNamespace, "EXTENSIONS_IGNORED");
+        state.block(RuleId::ExtensionFileLocation, "EXTENSIONS_IGNORED");
         return;
     };
     state.pass(RuleId::ExtensionsObject);
     if namespaces.is_empty() {
+        state.not_applicable(RuleId::ExtensionNamespace, "NO_NAMESPACES");
         state.not_applicable(RuleId::ExtensionUnknown, "NO_NAMESPACES");
+        state.not_applicable(RuleId::ExtensionFileLocation, "NO_NAMESPACES");
     } else {
+        let mut ambiguous = false;
+        for namespace in namespaces.keys() {
+            if namespace.is_empty() || namespace.contains('/') || namespace.contains('\\') {
+                state.fail(
+                    RuleId::ExtensionNamespace,
+                    &["extensions", namespace],
+                    "EXTENSION_NAMESPACE",
+                    "扩展 namespace 不能为空且不能包含路径分隔符",
+                );
+            } else {
+                ambiguous = true;
+            }
+        }
+        if ambiguous {
+            state.set(
+                RuleId::ExtensionNamespace,
+                CoverageStatus::Unchecked,
+                Some("NAMESPACE_SYNTAX_UNSPECIFIED"),
+            );
+        }
         state.set(
             RuleId::ExtensionUnknown,
-            CoverageStatus::Unchecked,
+            CoverageStatus::Manual,
+            Some("UNIMPLEMENTED_NAMESPACE"),
+        );
+        // Unknown extension directories are deliberately not enumerated: neither
+        // manifest data nor a same-named directory implies the other exists.
+        state.set(
+            RuleId::ExtensionFileLocation,
+            CoverageStatus::Manual,
             Some("UNIMPLEMENTED_NAMESPACE"),
         );
     }

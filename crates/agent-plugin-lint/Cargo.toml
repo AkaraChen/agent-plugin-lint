@@ -13,7 +13,7 @@ path = "src/main.rs"
 [dependencies]
 agent-skills-lint = { path = "../agent-skills-lint", version = "0.1.0" }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 semver = "1"
 libc = "0.2"
 url = "2"

@@ -96,11 +96,11 @@ fn obligation_serialization_uses_contract_tokens() {
 }
 
 #[test]
-fn unknown_extension_is_unchecked_without_a_finding() {
+fn unknown_extension_is_manual_without_a_finding() {
     let report = validate_manifest(&manifest(json!({"extensions": {"com.example": 3}})));
     assert!(report.findings.is_empty());
     let item = coverage(&report, "AP-EXTENSION-UNKNOWN");
-    assert_eq!(item.status, CoverageStatus::Unchecked);
+    assert_eq!(item.status, CoverageStatus::Manual);
     assert_eq!(item.reason_code.as_deref(), Some("UNIMPLEMENTED_NAMESPACE"));
 }
 

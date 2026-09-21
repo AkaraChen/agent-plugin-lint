@@ -1,9 +1,9 @@
-use crate::manifest::{invalid_json_manifest, validate_manifest};
+use crate::json::{self, Parsed};
+use crate::manifest::{invalid_json_manifest, validate_manifest_document};
 use crate::{
     Coverage, CoverageStatus, Finding, InputMode, Obligation, PluginReport, Policy, Radius, Report,
     RuleId, Scope, Subject, Summary, ToolError,
 };
-use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -279,15 +279,24 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
             match fs::metadata(&canonical_manifest) {
                 Ok(metadata) if metadata.is_file() => {
                     match crate::containment::read_safe(&root_canonical, &manifest_path) {
-                        Ok(source) => match serde_json::from_str::<Value>(&source) {
-                            Ok(value) => from_validation(
+                        Ok(source) => match json::parse(&source) {
+                            Parsed::Value {
+                                value,
+                                duplicate_keys,
+                            } => from_validation(
                                 root_name,
                                 &root_canonical,
-                                validate_manifest(&value),
+                                validate_manifest_document(&value, duplicate_keys),
                             ),
-                            Err(_) => {
+                            Parsed::Syntax => {
                                 from_validation(root_name, &root_canonical, invalid_json_manifest())
                             }
+                            Parsed::Representation => outcome_representation(
+                                root_name,
+                                &manifest_path,
+                                "MANIFEST_JSON_REPRESENTATION",
+                                "plugin.json 的 JSON 数值超出当前解析器表示能力",
+                            ),
                         },
                         Err(crate::containment::ReadError::InputChanged) => outcome_error(
                             root_name,
@@ -356,7 +365,11 @@ fn from_validation(
         RuleId::SkillConformance,
     ] {
         let (status, reason_code) = if rule == RuleId::AdviceDuplicateJsonKey {
-            (CoverageStatus::Unchecked, "NOT_IMPLEMENTED_S5")
+            match validation.duplicate_json_keys {
+                Some(true) => (CoverageStatus::Fail, "DUPLICATE_JSON_KEY"),
+                Some(false) => (CoverageStatus::Pass, "NO_DUPLICATE_JSON_KEY"),
+                None => (CoverageStatus::Unchecked, "SOURCE_UNAVAILABLE"),
+            }
         } else {
             (gate, reason)
         };
@@ -376,6 +389,16 @@ fn from_validation(
         findings: validation.findings,
         coverage,
     };
+    if validation.duplicate_json_keys == Some(true) {
+        add_finding(
+            &mut plugin,
+            RuleId::AdviceDuplicateJsonKey,
+            "plugin.json".into(),
+            Scope::Plugin,
+            "DUPLICATE_JSON_KEY",
+            "JSON 对象存在重复键；后续校验按最后一个值进行",
+        );
+    }
     let mut errors = vec![];
     if !validation.rejected {
         plugin.coverage.retain(|c| {
@@ -438,6 +461,23 @@ fn from_validation(
         }
     }
     PluginOutcome { plugin, errors }
+}
+
+fn outcome_representation(root: String, path: &Path, code: &str, message: &str) -> PluginOutcome {
+    let mut plugin = unread_plugin(root);
+    for coverage in &mut plugin.coverage {
+        if coverage.rule_id == RuleId::ManifestJson.as_str() {
+            coverage.status = CoverageStatus::Unchecked;
+            coverage.reason_code = Some("JSON_REPRESENTATION".into());
+        } else {
+            coverage.status = CoverageStatus::Blocked;
+            coverage.reason_code = Some("JSON_REPRESENTATION".into());
+        }
+    }
+    PluginOutcome {
+        plugin,
+        errors: vec![tool_error(path, code, message)],
+    }
 }
 
 pub(crate) fn add_finding(
@@ -1001,7 +1041,9 @@ fn unread_coverage(failed_rule: Option<RuleId>) -> Vec<Coverage> {
         RuleId::NameRepetition,
         RuleId::VersionSemver,
         RuleId::ExtensionsObject,
+        RuleId::ExtensionNamespace,
         RuleId::ExtensionUnknown,
+        RuleId::ExtensionFileLocation,
         RuleId::AdviceDuplicateJsonKey,
         RuleId::McpEnvelope,
         RuleId::SkillConformance,
