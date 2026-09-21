@@ -1,0 +1,112 @@
+{
+  "source": "research/1.0.0.md §5.2, §8.1, §10.1",
+  "spec": "§5.2, §8.1, §10.1, §10.2",
+  "decision": "D3, D4, D5",
+  "unknownExtension": {
+    "manifest": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "name": "d5-case",
+      "extensions": {
+        "com.example.client": 3,
+        "org.example": []
+      }
+    },
+    "defaultExit": 0,
+    "strictExit": 1,
+    "rule": "AP-EXTENSION-UNKNOWN",
+    "target": "plugin.json",
+    "status": "manual",
+    "reason": "UNIMPLEMENTED_NAMESPACE",
+    "source": "research/1.0.0.md",
+    "decision": "D3, D4, D5",
+    "spec": "§8.1; §10.2"
+  },
+  "illegalNamespace": {
+    "manifest": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "name": "d5-case",
+      "extensions": {
+        "../bad": {}
+      }
+    },
+    "defaultExit": 1,
+    "strictExit": 1,
+    "rule": "AP-EXTENSION-NAMESPACE",
+    "target": "plugin.json",
+    "status": "fail",
+    "reason": "EXTENSION_NAMESPACE",
+    "finding": "AP-EXTENSION-NAMESPACE",
+    "radius": "fatal",
+    "normative": true,
+    "obligation": "MUST",
+    "source": "research/1.0.0.md",
+    "decision": "D3, D4, D5",
+    "spec": "§8.1"
+  },
+  "unknownTop": {
+    "manifest": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "name": "d5-case",
+      "future": true
+    },
+    "defaultExit": 1,
+    "strictExit": 1,
+    "rule": "AP-MANIFEST-UNKNOWN-FIELD",
+    "target": "plugin.json",
+    "status": "fail",
+    "reason": "UNKNOWN_FIELD",
+    "finding": "AP-MANIFEST-UNKNOWN-FIELD",
+    "radius": "ignored",
+    "normative": true,
+    "obligation": "MUST",
+    "source": "research/1.0.0.md",
+    "decision": "D3, D4, D5",
+    "spec": "§5.2"
+  },
+  "nonObjectExtensions": {
+    "manifest": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "name": "d5-case",
+      "extensions": []
+    },
+    "defaultExit": 1,
+    "strictExit": 1,
+    "rule": "AP-EXTENSIONS-OBJECT",
+    "target": "plugin.json",
+    "status": "fail",
+    "reason": "EXTENSIONS_NOT_OBJECT",
+    "finding": "AP-EXTENSIONS-OBJECT",
+    "radius": "ignored",
+    "normative": true,
+    "obligation": "MUST",
+    "source": "research/1.0.0.md",
+    "decision": "D3, D4, D5",
+    "spec": "§5.2; §8.1"
+  },
+  "semverAdvice": {
+    "manifest": {
+      "$schema": "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json",
+      "name": "d5-case",
+      "version": "not-semver"
+    },
+    "defaultExit": 0,
+    "strictExit": 1,
+    "rule": "AP-VERSION-SEMVER",
+    "target": "plugin.json",
+    "status": "fail",
+    "reason": "SEMVER",
+    "finding": "AP-VERSION-SEMVER",
+    "radius": "advisory",
+    "normative": true,
+    "obligation": "SHOULD",
+    "spec": "§10.2",
+    "source": "research/1.0.0.md",
+    "decision": "D3, D4, D5"
+  },
+  "representation": {
+    "source": "research/1.0.0.md",
+    "spec": "§5.2; §10.1",
+    "decision": "D4",
+    "sourceText": "{\"unknown\":1e400}"
+  }
+}

@@ -78,7 +78,7 @@ AP §7.1 将格式要求交给 Agent Skills。本轮冻结 research/agent-skills
 | AP-MCP-SCHEMA-ID | §7.2.1 L309,311；§7.2.2 L396 | component | true/MUST；P/S | MCP canonical ID 必须受支持；类型/缺失先由 envelope 报；不发请求。版本不支持同时不匹配时由 VERSION-MATCH 优先报告一次并带原因。 | 1.0.0/mcp.schema.json | 1.0.0/plugin.schema.json |
 | AP-MCP-VERSION-MATCH | §7.2.2, §10.1 L396,508 | component | true/MUST；P/S | 对识别出的 canonical 标识提取版本，与已有效 plugin manifest 比较；不比较两 URL 整串，也不比较 plugin.version。 | plugin 1.0.0，mcp 1.0.0 | plugin 1.0.0，mcp 1.1.0 |
 | AP-MCP-SERVER-VARIANT | §7.2.1 L305,313–347 | component | true/MUST；P/S | 每 entry 独立闭合：stdio={type,command,args?,env?,cwd?}；remote={type,url,headers?}，type仅三枚；字段类型按表。值非对象/数组、未知字段/跨变体字段、缺必填均只废该 server。server key 不额外套 plugin name 规则。 | {type:stdio,command:node,args:[]} | stdio含url；type:http；值null |
-| AP-MCP-COMMAND | §7.2.1 L325 | component | true/MUST；P/S | 单个可执行 token，只准裸名或 ./ 路径；不分词、不 shell 执行、不展开。./ 路径中空格不能直接判 shell 串；裸名含空白/引号/运算符的歧义按 DESIGN 返回 advisory 待核而非未经证实的 fatal。绝对路径/../ 路径确定非法。 | node；./bin/my server | /usr/bin/node；../server |
+| AP-MCP-COMMAND | §7.2.1 L325 | component | true/MUST；P/S | 单个可执行 token，只准裸名或 ./ 路径；不分词、不 shell 执行、不展开。./ 路径中空格不能直接判 shell 串；裸名仅对ASCII字母/数字及._+-组成的保守核心判已检；其余字符按D5记advisory + unchecked，不据此判MUST违规。绝对路径/../ 路径确定非法。 | node；./bin/my server | /usr/bin/node；../server |
 | AP-MCP-BUNDLED-COMMAND | §7.2.1 L327 | component | true/MUST；P/M | 确知意图执行包内二进制时必须 ./ 路径；同名文件存在不证明裸命令指向它。v1 不读程序以猜意图。 | 包内 bin/a 用 ./bin/a | 已确认依赖包内 a 却用 command:a |
 | AP-MCP-PATH-DEPENDENCE | §7.2.1 L327 | advisory | true/MUST；P/M | 不依赖配置 PATH 参与裸名查找；有 env.PATH 本身合法。需作者说明或宿主对照执行证明依赖，规范未指定独立失败边界。 | 裸node来自平台搜索 | 只有 env.PATH 生效时才找得到必需命令 |
 | AP-MCP-CWD-FORM | §7.2.1 L331–337 | component | true/MUST；P/S | 缺省合法；存在时三种精确前缀：./、${PLUGIN_ROOT}(后接/或结束)、${PLUGIN_DATA}(后接/或结束)。展开后 containment 单独检查。 | ${PLUGIN_DATA}/cache | data；${PLUGIN_ROOT}suffix；/tmp |
@@ -89,8 +89,8 @@ AP §7.1 将格式要求交给 Agent Skills。本轮冻结 research/agent-skills
 | AP-MCP-ENV-SECRETS | §9.2 L479；§7.2.2 L397 | component | true/MUST；P/M | 与header同样区分确定秘密与怀疑；不在报告回显值。 | env:{MODE:"test"} | 已确认凭据明文放env |
 | AP-MCP-RESERVED-ENV | §9.2 L481 | component | true/MUST；P/S | 精确键 PLUGIN_ROOT/PLUGIN_DATA 禁止；等价大小写是否同样违规原文未明确，v1混合大小写仅advisory，运行时仍须按平台覆盖。 | env:{DATA_DIR:"${PLUGIN_DATA}"} | env:{PLUGIN_ROOT:"/tmp"} |
 | AP-ADVICE-POSSIBLE-SECRET | §7.2.1, §9.2（启发式） | advisory | false/NONE；P/S | 键名不区分大小写匹配 token/secret/password/api_key 或 Authorization/Proxy-Authorization，加非空字面值即提示候选；可误报样例、漏报随机名。不给真实性背书，不输出原值或摘要。 | MODE:test | API_TOKEN:example 被提示但不判确定违规 |
-| AP-ADVICE-AMBIGUOUS-COMMAND | §7.2.1 L325（语法欠定） | advisory | false/NONE；P/S | 裸名含空白、shell标点，或未能证明为单个可执行路径时提示检查；不将字符串自动拆成 args。文件名可含这些字符。 | node | node --version；echo x > y |
-| AP-ADVICE-ENV-CASE | §9.1–9.2 L460,481（平台差异） | advisory | false/NONE；P/S | env含与保留名仅大小写不同的键，或用户键相互仅大小写不同，提示平台行为差异；没有 --host 推断。 | DATA_DIR | plugin_root；Path与PATH |
+| AP-ADVICE-AMBIGUOUS-COMMAND | §7.2.1 L325（语法欠定） | advisory | false/NONE；P/S | 裸名在ASCII字母/数字及._+-的已检核心之外（含空白、控制字符、shell标点、反斜杠、冒号和Unicode），按D5提示并记录unchecked；此为检查能力边界，不是规范白名单，不自动拆成args。 | node | node --version；echo x > y |
+| AP-ADVICE-ENV-CASE | §9.1–9.2 L460,481（平台差异） | advisory | false/NONE；P/S | env含ASCII保留名大小写变体、用户键ASCII大小写冲突或非ASCII键，提示平台语义未检查；不以Unicode大小写转换猜Windows等价，无 --host 推断。 | DATA_DIR | plugin_root；Path与PATH |
 | AP-CLIENT-COMMAND-RESOLUTION | §7.2.1 L325,329 | advisory | true/MUST；C/T | 裸名走平台搜索，./走R；命令无占位符替换；即使用平台解释器启动.cmd也保留单token并分离args。不在linter做实际搜索/启动。 | executable与args分开传递 | 拼接shell串；展开command中的ROOT |
 | AP-CLIENT-CWD | §7.2.1 L331,337,339 | advisory | true/MUST；C/T | 缺省R；先一次展开再文件系统解析并校验对应R/D边界。参数cwd里的未知placeholder仍是字面。 | 缺cwd→R | 缺cwd→启动linter的工作目录 |
 | AP-CLIENT-REMOTE-LITERALS | §7.2.1 L353 | advisory | true/MUST；C/T | url/header名/值完全不做placeholder或环境变量替换；字面包含占位符不自动等于包违规，另看URL/header语法。 | X-Dir:${PLUGIN_ROOT}保持字面 | 将header的ROOT替成路径 |
@@ -111,7 +111,7 @@ AP §7.1 将格式要求交给 Agent Skills。本轮冻结 research/agent-skills
 |---|---|---|---|---|---|---|
 | AP-EXTENSIONS-OBJECT | §5.2, §8.1, §11.3 L147,411,427,546 | ignored | true/MUST；P/S | extensions非对象（含null/数组）报告并忽略整个字段，仍加载有效组件。这是第二个非fatal例外。 | extensions:{} | extensions:[] |
 | AP-EXTENSION-NAMESPACE | §8, §8.1 L403,411 | fatal | true/MUST；P/S | namespace要reverse-domain；仅明确非法时使用fatal，语法边缘按D3定案未检查；空名或含路径分隔符明确不构成reverse-domain。标签数和完整语法未在本地正文定义，schema正文已核实但未定义 namespace 正则，无点/空段/IDN/大小写/下划线等暂不强判，记未评估；不能查DNS证明控制权。 | com.openai | ""；../x（example/com..x暂列未评估） |
-| AP-EXTENSION-VALUE | §8.1 L411,427；§11.1 L532 | ignored | true/MUST；P/M | 本行ignored保留历史规则索引，不作为未知namespace的实际判罚。D3已定案：未知value不检查、不据此判作者侧违规。包结构要求每value为对象，与忽略未知value不验证的client要求存在解释空间。v1不实现namespace，故不检查未知value，记unchecked-by-design；人工确认非对象可记录包侧不合规，半径未获规范明确裁决，不得自动升级fatal。 | com.x:{} | com.x:3（作者侧要求不符，客户端处理待澄清） |
+| AP-EXTENSION-VALUE | §8.1 L411,427；§11.1 L532 | ignored | true/MUST；P/M | 本行ignored保留历史规则索引，不作为未知namespace的实际判罚。D3已定案：v1不实现namespace，未知value整体不检查、不据此判作者侧违规；coverage为manual/UNIMPLEMENTED_NAMESPACE。§8.1对象形状要求与未知值免验证条款同时保留，不从未知值类型推断失败。 | com.x:{}（value不检） | com.x:3、com.x:[]（value同样不检，无违规finding） |
 | AP-EXTENSION-UNKNOWN | §8.1, §11.1 L427,532 | advisory | true/MUST；C/T | 不实现的namespace值整体不解释/不检查内容，不运行私有校验器；顶层extensions类型与namespace键仍处理。 | 未知namespace含任意对象内容不报错 | 遍历com.openai.interface并要求自定字段 |
 | AP-EXTENSION-FILE-LOCATION | §8, §8.2 L403,431,446 | advisory | true/MUST；P/M | 已确认某文件属于某扩展时应在同名顶层目录；未知文件不凭目录名推断意图。规范未给通用包失败半径；client文件发现行为另测。manifest数据和目录可各自独立。 | 仅com.x/；仅extensions.com.x | 已声明使用com.x的file行为却从其他目录取该扩展 |
 | AP-EXTENSION-CLIENT-DISCOVERY | §8.2 L446 | advisory | true/MUST；C/T | 实现某namespace的file行为才去对应顶层目录；没有目录不自动报错。 | 实现com.x→查R/com.x | 从R/private/com.x发现同一file扩展 |

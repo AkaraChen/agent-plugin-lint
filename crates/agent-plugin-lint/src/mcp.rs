@@ -440,10 +440,7 @@ fn stdio(
                 "COMMAND_CONTAINED",
             ),
         }
-    } else if command
-        .chars()
-        .any(|c| c.is_whitespace() || "'\";|&><`$()".contains(c))
-    {
+    } else if !safe_bare_command(command) {
         add_finding_pointer(
             plugin,
             RuleId::AdviceAmbiguousCommand,
@@ -666,7 +663,9 @@ fn env_checks(
             );
             return false;
         }
-        if !lower.insert(key.to_ascii_lowercase())
+        let non_ascii = !key.is_ascii();
+        if non_ascii
+            || !lower.insert(key.to_ascii_lowercase())
             || matches!(
                 key.to_ascii_uppercase().as_str(),
                 "PLUGIN_ROOT" | "PLUGIN_DATA"
@@ -678,7 +677,11 @@ fn env_checks(
                 "mcp.json".into(),
                 Scope::Server(name.into()),
                 Some(format!("{pointer}/env/{}", escape(key))),
-                "ENV_CASE",
+                if non_ascii {
+                    "ENV_CASE_UNCHECKED"
+                } else {
+                    "ENV_CASE"
+                },
                 "env 键的大小写在不同平台可能冲突",
             );
         }
@@ -702,6 +705,13 @@ fn env_checks(
         }
     }
     true
+}
+
+fn safe_bare_command(command: &str) -> bool {
+    !command.is_empty()
+        && command
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || b"._+-".contains(&byte))
 }
 
 fn cwd_check(

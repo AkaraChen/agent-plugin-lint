@@ -158,3 +158,23 @@ astra在隔离源码副本中只将O_NONBLOCK改为0，FIFO substitution单测�
 内容确认片已去掉额外Windows诊断查询，三条同长度/恢复mtime的精确InputChanged断言均保留。astra再次亲自执行 `cargo fmt --all -- --check`、`cargo test --workspace --locked`、`cargo clippy --workspace --all-targets --locked -- -D warnings`、`git diff --check` 均过，原生CI结果另记。
 
 追加README任务由astra撰写，71cda37直接推main，仅双语README变更。安装命令在614f45d源码的隔离worktree执行 `cargo install --path crates/agent-plugin-lint --locked --offline --root <临时目录>` 成功；安装二进制扫描frontend真实语料，README输出节选逐字匹配、退出1。README保留当时main的Linux已验/其余未验状态，安全读取改动仍仅在未合并PR分支。main已合入ci/platform-matrix。
+
+435e0cd 的[原生CI 35602213309](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35602213309)三平台clippy/test与fmt全部通过。Windows lib 15/15，明确包含原地同长度/恢复mtime的InputChanged回归；额外身份诊断查询已移除，实际正文打开仍在BeforeOpen hook之后。此片通过后才授权Terra开始D5 fixture片。
+
+### 本轮能力边界
+
+Windows原生CI验证普通文件路径、volume+128bit file ID、同长度恢复mtime的替换/原地改写、Unsupported报告传播及非平台特定测试。Unix symlink/FIFO测试没有在Windows伪装执行；Windows junction/reparse point与真实eric-way链接语料仍未验。macOS/Linux各自执行Unix链接与FIFO测试；macOS runner拒绝创建非法UTF-8目录项，真实目录项扫描场景未验，单独的入口编码错误与明确EILSEQ创建失败已验。
+
+Unsupported传播使用测试注入：manifest/skill/MCP均验证exit2、complete=false、unchecked以及依赖blocked，并证明不解析未读输入/不生成包侧MUST。实际不支持FileIdInfo的Windows文件系统、网络挂载、其他文件系统实现尚未复现；不声称注入等于这些介质实测。安全读取的二次内容确认仍不是原子快照，未证明所有并发调度。MSRV未做最低版本矩阵；本机Rust1.97.1、当次CI稳定Rust1.98.1通过不能推断更低版本。
+
+### D3/D4/D7 review 与 D5 设计
+
+D3代码符合§8.1：未知namespace的number/array值没有finding，value为manual/UNIMPLEMENTED_NAMESPACE；strict的1来自namespace语法unchecked，不是value被判错。旧rules.md仍暗示可据未知value类型判作者违规，已改为与定案、实现一致。D4的finish_report显式按normative + Certain + Package + MUST判exit1，不过滤ignored；纯advisory默认0，strict再拦，工具错误2优先。D7代码未增加--fix/host/SARIF或发布/归档动作，workspace可build。
+
+D5初始实际CLI探针发现drive/backslash/NUL/Unicode command、部分Unicode env key默认/strict都0；这是未检查形态被漏放行。按§7.2.1与D5扩大command欠定分支，保留AMBIGUOUS_COMMAND机器码；按§9.1–9.2将非ASCII env key的等价语义标advisory，值仍opaque（§4.1(5)）。不把保守ASCII检查核心升级为规范字符白名单。
+
+fixture review退回过字面量\x01冒充控制字符、过度转义的Windows路径，补实际U+0001/NUL/UNC字符断言；退回过把SemVer obligation从Should改为Recommended的未提交实现：§10.2明确SHOULD，既有映射同时覆盖§5.4的RECOMMENDED，不应为错误fixture改变生产规则。fixture预期按原文纠正，规则元数据保持原状。
+
+README定位句按追加标准修订为通用linter描述，c71e7db已直接推main并合入本分支。
+
+D5收口为44个持久边界fixture，另有5个D3/D4单包策略fixture及1个混合集合操作错误优先级场景。各例带规范来源/具体§和定案编号；Rust集成测试在library及实际CLI的default/strict两条路径核对固定预期、目标coverage与finding属性，欠定项无normative MUST，正常对照无finding。command只对保守ASCII核心判已检，其余advisory+unchecked；非ASCIIenv键为advisory。loopback现有保守语义未更改。astra读完生产diff与fixture后独立运行workspace test/clippy/fmt/diffcheck均过，随后才推原生CI。
