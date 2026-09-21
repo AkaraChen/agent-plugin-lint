@@ -38,7 +38,7 @@ pub fn validate_manifest(value: &Value) -> ManifestValidation {
             RuleId::ManifestJson,
             &[],
             "MANIFEST_NOT_OBJECT",
-            "plugin.json 顶层必须是对象",
+            "plugin.json must be a top-level object",
         );
         state.block_all_except(RuleId::ManifestJson, "ROOT_NOT_OBJECT");
         return state.finish();
@@ -59,7 +59,7 @@ pub fn validate_manifest(value: &Value) -> ManifestValidation {
                 RuleId::ManifestSchemaId,
                 &["$schema"],
                 "SCHEMA_ID",
-                "不支持的 schema 标识",
+                "unsupported schema identifier",
             );
         }
     } else {
@@ -100,7 +100,7 @@ pub fn invalid_json_manifest() -> ManifestValidation {
         RuleId::ManifestJson,
         &[],
         "JSON_INVALID",
-        "plugin.json 不是有效 JSON",
+        "plugin.json is not valid JSON",
     );
     state.block_all_except(RuleId::ManifestJson, "JSON_INVALID");
     state.finish()
@@ -234,7 +234,7 @@ fn validate_unknown_fields(manifest: &Map<String, Value>, state: &mut State) {
                 RuleId::ManifestUnknownField,
                 &[key],
                 "UNKNOWN_FIELD",
-                "未知顶层字段将被忽略",
+                "unknown top-level field will be ignored",
             );
         }
     }
@@ -253,7 +253,7 @@ fn required(manifest: &Map<String, Value>, key: &str, state: &mut State) -> bool
                 RuleId::ManifestRequired,
                 &[key],
                 "REQUIRED_FIELD",
-                "必需字段缺失、类型不正确或为空",
+                "required field is missing, has the wrong type, or is empty",
             );
             false
         }
@@ -267,7 +267,7 @@ fn validate_name(name: &str, state: &mut State) {
             RuleId::NameLength,
             &["name"],
             "NAME_LENGTH",
-            "插件名称长度超出范围",
+            "plugin name length is out of range",
         );
     } else {
         state.pass(RuleId::NameLength);
@@ -280,7 +280,7 @@ fn validate_name(name: &str, state: &mut State) {
             RuleId::NameCharset,
             &["name"],
             "NAME_CHARSET",
-            "插件名称包含不允许的字符",
+            "plugin name contains characters that are not allowed",
         );
     } else {
         state.pass(RuleId::NameCharset);
@@ -299,7 +299,7 @@ fn validate_name(name: &str, state: &mut State) {
             RuleId::NameEnds,
             &["name"],
             "NAME_ENDS",
-            "插件名称首尾必须为字母或数字",
+            "plugin name must start and end with a letter or digit",
         );
     } else {
         state.pass(RuleId::NameEnds);
@@ -310,7 +310,7 @@ fn validate_name(name: &str, state: &mut State) {
             RuleId::NameRepetition,
             &["name"],
             "NAME_REPETITION",
-            "插件名称不能包含连续分隔符",
+            "plugin name must not contain repeated separators",
         );
     } else {
         state.pass(RuleId::NameRepetition);
@@ -340,14 +340,14 @@ fn validate_metadata(manifest: &Map<String, Value>, state: &mut State) {
             RuleId::ManifestMetadataType,
             &[field],
             "METADATA_TYPE",
-            "元数据字段类型不正确",
+            "metadata field has the wrong type",
         );
     } else if keywords_invalid {
         state.fail(
             RuleId::ManifestMetadataType,
             &["keywords"],
             "KEYWORDS_TYPE",
-            "keywords 必须是字符串数组",
+            "keywords must be an array of strings",
         );
     } else {
         state.pass(RuleId::ManifestMetadataType);
@@ -363,7 +363,7 @@ fn validate_author(manifest: &Map<String, Value>, state: &mut State) {
             RuleId::ManifestAuthor,
             &["author"],
             "AUTHOR_TYPE",
-            "author 必须是对象",
+            "author must be an object",
         );
         return;
     };
@@ -375,7 +375,7 @@ fn validate_author(manifest: &Map<String, Value>, state: &mut State) {
                 RuleId::ManifestAuthor,
                 &["author", key],
                 "AUTHOR_FIELD",
-                "author 字段不正确",
+                "author field is invalid",
             );
         }
     }
@@ -396,7 +396,7 @@ fn validate_extensions(manifest: &Map<String, Value>, state: &mut State) {
             RuleId::ExtensionsObject,
             &["extensions"],
             "EXTENSIONS_NOT_OBJECT",
-            "extensions 不是对象，已忽略",
+            "extensions is not an object and will be ignored",
         );
         state.block(RuleId::ExtensionUnknown, "EXTENSIONS_IGNORED");
         state.block(RuleId::ExtensionNamespace, "EXTENSIONS_IGNORED");
@@ -416,7 +416,7 @@ fn validate_extensions(manifest: &Map<String, Value>, state: &mut State) {
                     RuleId::ExtensionNamespace,
                     &["extensions", namespace],
                     "EXTENSION_NAMESPACE",
-                    "扩展 namespace 不能为空且不能包含路径分隔符",
+                    "extension namespace must be non-empty and must not contain path separators",
                 );
             } else {
                 ambiguous = true;
@@ -457,7 +457,7 @@ fn validate_version(manifest: &Map<String, Value>, state: &mut State) {
             RuleId::VersionSemver,
             &["version"],
             "SEMVER",
-            "version 不是推荐的 SemVer 形式",
+            "version is not the recommended SemVer form",
         );
     } else {
         state.pass(RuleId::VersionSemver);

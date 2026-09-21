@@ -43,13 +43,24 @@ ap-lint path/to/plugin --strict
 
 `--strict` 还会因 advisory 和具体目标上未检查的静态项返回失败。全部参数见 `ap-lint --help`。
 
-诊断与 CLI help 目前是中文。
+诊断与 CLI help 是英文。
 
 扫描 [eric-way](https://github.com/AkaraChen/eric-way) 的 `frontend` 插件时，输出节选如下：
 
 ```text
-插件根：.（状态：accepted）
-AP-PATH-RESOURCE-ESCAPE skills/e2e-testing/references/docker.md §4.1 RESOURCE_OUTSIDE_ROOT [.] field=/ hint=无：资源路径位于包根之外，访问时会被拒绝
+plugin
+  root: .
+  status: accepted
+
+finding
+  rule: AP-PATH-RESOURCE-ESCAPE
+  path: skills/e2e-testing/references/docker.md
+  spec: §4.1
+  radius: ignored
+  effect: deny-path
+  scope: path skills/e2e-testing/references/docker.md
+  evidence: RESOURCE_OUTSIDE_ROOT
+  message: access to this resource path is denied because it is outside the package root
 ```
 
 这条符号链接指向插件根目录之外。按 §4.1，客户端必须拒绝访问该资源路径。这次扫描的退出码为 `1`。

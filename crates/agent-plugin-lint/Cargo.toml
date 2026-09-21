@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "离线、只读的 Agent Plugins 校验库"
+description = "Offline, read-only Agent Plugins linter"
 include = ["src/**", "schemas/**", "LICENSE", "THIRD_PARTY.md", "Cargo.toml"]
 
 [[bin]]
@@ -13,6 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 agent-skills-lint = { path = "../agent-skills-lint", version = "0.1.0" }
+clap = { version = "4", features = ["derive"] }
 serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 semver = "1"

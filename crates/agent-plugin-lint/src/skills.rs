@@ -49,9 +49,10 @@ pub fn validate(
                 effect: meta.effect,
                 evidence_code: format!("{:?}", issue.kind),
                 message: if issue.level == IssueLevel::Advisory {
-                    "Skill 建议项需要处理".into()
+                    "skill advisory needs attention".into()
                 } else {
-                    "Skill 格式不符合 Agent Skills 规范，已跳过该 skill".into()
+                    "skill does not match the Agent Skills specification; this skill was skipped"
+                        .into()
                 },
                 hint: issue.field.clone(),
                 line: issue.location.map(|x| x.line),

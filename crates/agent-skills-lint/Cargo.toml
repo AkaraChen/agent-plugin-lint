@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 repository.workspace = true
-description = "离线、只读的 Agent Skills 校验库"
+description = "Offline, read-only Agent Skills linter"
 include = ["src/**", "LICENSE", "MIGRATION.md", "Cargo.toml"]
 
 [dependencies]

@@ -45,7 +45,7 @@ impl<'de> Deserialize<'de> for StringKey {
         impl<'de> Visitor<'de> for V {
             type Value = StringKey;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("字符串 YAML mapping key")
+                f.write_str("a string YAML mapping key")
             }
             fn visit_str<E: de::Error>(self, v: &str) -> Result<StringKey, E> {
                 Ok(StringKey(v.to_owned()))
@@ -63,7 +63,7 @@ impl<'de> Deserialize<'de> for YamlValue {
         impl<'de> Visitor<'de> for V {
             type Value = YamlValue;
             fn expecting(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-                f.write_str("YAML 值")
+                f.write_str("a YAML value")
             }
             fn visit_unit<E: de::Error>(self) -> Result<YamlValue, E> {
                 Ok(YamlValue::Null)
@@ -116,29 +116,29 @@ pub struct Frontmatter {
 /// 内容错误；不表示文件系统 I/O 错误。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Error)]
 pub enum ParseError {
-    #[error("缺少 YAML frontmatter")]
+    #[error("missing YAML frontmatter")]
     MissingFrontmatter,
-    #[error("YAML frontmatter 未结束")]
+    #[error("YAML frontmatter is not closed")]
     UnclosedFrontmatter,
-    #[error("YAML frontmatter 语法无效")]
+    #[error("YAML frontmatter syntax is invalid")]
     InvalidYaml,
-    #[error("YAML frontmatter 根节点不是 mapping")]
+    #[error("YAML frontmatter root is not a mapping")]
     NotMapping,
-    #[error("YAML 合法但无法安全检查")]
+    #[error("YAML is valid but cannot be checked safely")]
     UnsupportedYaml,
 }
 /// 目录 API 的 I/O 错误。
 #[derive(Debug, Error)]
 pub enum SkillIoError {
-    #[error("路径不存在: {0}")]
+    #[error("path does not exist: {0}")]
     NotFound(PathBuf),
-    #[error("不是目录: {0}")]
+    #[error("not a directory: {0}")]
     NotDirectory(PathBuf),
-    #[error("目录名不是有效 UTF-8: {0}")]
+    #[error("directory name is not valid UTF-8: {0}")]
     NonUtf8Directory(PathBuf),
-    #[error("缺少 SKILL.md: {0}")]
+    #[error("missing SKILL.md: {0}")]
     MissingSkillFile(PathBuf),
-    #[error("读取 {path} 失败: {source}")]
+    #[error("failed to read {path}: {source}")]
     Read {
         path: PathBuf,
         #[source]

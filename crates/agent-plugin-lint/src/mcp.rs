@@ -23,7 +23,12 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
             "MCP_ABSENT",
         ),
         Err(_) => {
-            error(errors, &path, "MCP_METADATA_IO", "无法读取 mcp.json 元数据");
+            error(
+                errors,
+                &path,
+                "MCP_METADATA_IO",
+                "cannot read mcp.json metadata",
+            );
             coverage(
                 plugin,
                 RuleId::McpEnvelope,
@@ -39,7 +44,7 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                 "mcp.json".into(),
                 Scope::ComponentType("mcp".into()),
                 "MCP_OUTSIDE_ROOT",
-                "mcp.json 位于包根之外，已禁用 MCP 组件",
+                "mcp.json is outside the package root; MCP is disabled",
             ),
             Ok(Resolution::Unresolved) => add_finding(
                 plugin,
@@ -47,9 +52,9 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                 "mcp.json".into(),
                 Scope::ComponentType("mcp".into()),
                 "MCP_UNRESOLVED",
-                "mcp.json 无法解析为普通文件，已禁用 MCP 组件",
+                "mcp.json does not resolve to a regular file; MCP is disabled",
             ),
-            Err(_) => error(errors, &path, "MCP_CANONICALIZE", "无法解析 mcp.json"),
+            Err(_) => error(errors, &path, "MCP_CANONICALIZE", "cannot resolve mcp.json"),
             Ok(Resolution::Inside(actual)) => match containment::regular(&actual) {
                 Ok(false) => add_finding(
                     plugin,
@@ -57,10 +62,15 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                     "mcp.json".into(),
                     Scope::ComponentType("mcp".into()),
                     "MCP_WRONG_KIND",
-                    "mcp.json 必须是普通文件，已禁用 MCP 组件",
+                    "mcp.json must be a regular file; MCP is disabled",
                 ),
                 Err(_) => {
-                    error(errors, &path, "MCP_METADATA_IO", "无法读取 mcp.json 元数据");
+                    error(
+                        errors,
+                        &path,
+                        "MCP_METADATA_IO",
+                        "cannot read mcp.json metadata",
+                    );
                     coverage(
                         plugin,
                         RuleId::McpEnvelope,
@@ -100,14 +110,14 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                                 RuleId::McpEnvelope,
                                 None,
                                 "MCP_JSON",
-                                "mcp.json 不是有效 JSON，已禁用 MCP 组件",
+                                "mcp.json is not valid JSON; MCP is disabled",
                             ),
                             Parsed::Representation => {
                                 error(
                                     errors,
                                     &path,
                                     "MCP_JSON_REPRESENTATION",
-                                    "mcp.json 超出当前解析器表示能力（如数值范围或嵌套深度）",
+                                    "mcp.json exceeds this parser's representation limits (numeric range or nesting depth)",
                                 );
                                 representation_block(plugin);
                             }
@@ -117,7 +127,7 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                                 errors,
                                 &path,
                                 "INPUT_CHANGED",
-                                "读取 mcp.json 时输入发生变化",
+                                "mcp.json changed while it was being read",
                             );
                             coverage(
                                 plugin,
@@ -132,7 +142,7 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                                 errors,
                                 &path,
                                 "MCP_READ",
-                                "mcp.json 不是可安全读取的普通文件",
+                                "mcp.json is not a regular file that can be read safely",
                             );
                             coverage(
                                 plugin,
@@ -147,12 +157,12 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                                 errors,
                                 &path,
                                 "SAFE_READ_UNSUPPORTED",
-                                "当前平台无法安全读取 mcp.json 内容",
+                                "this platform cannot safely read mcp.json",
                             );
                             safe_read_unsupported_block(plugin);
                         }
                         Err(ReadError::Io(_)) => {
-                            error(errors, &path, "MCP_READ", "无法读取 mcp.json 内容");
+                            error(errors, &path, "MCP_READ", "cannot read mcp.json");
                             coverage(
                                 plugin,
                                 RuleId::McpEnvelope,
@@ -230,7 +240,7 @@ fn duplicate_coverage(plugin: &mut PluginReport, duplicate_keys: bool) {
             "mcp.json".into(),
             Scope::ComponentType("mcp".into()),
             "DUPLICATE_JSON_KEY",
-            "JSON 对象存在重复键；后续校验按最后一个值进行",
+            "JSON object has duplicate keys; later checks use the last value",
         );
     }
 }
@@ -242,7 +252,7 @@ fn envelope(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>,
             RuleId::McpEnvelope,
             None,
             "MCP_NOT_OBJECT",
-            "mcp.json 顶层必须是对象，已禁用 MCP 组件",
+            "mcp.json must be a top-level object; MCP is disabled",
         );
     };
     if object.len() != 2
@@ -256,7 +266,7 @@ fn envelope(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>,
             RuleId::McpEnvelope,
             None,
             "MCP_ENVELOPE",
-            "mcp.json 顶层字段不符合规范，已禁用 MCP 组件",
+            "mcp.json top-level fields do not match the specification; MCP is disabled",
         );
     }
     let schema = object["$schema"].as_str().expect("string checked");
@@ -276,9 +286,9 @@ fn envelope(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>,
                 "MCP_VERSION_MISMATCH"
             },
             if rule == RuleId::McpSchemaId {
-                "mcp.json 的 schema 标识符不受支持，已禁用 MCP 组件"
+                "mcp.json schema identifier is unsupported; MCP is disabled"
             } else {
-                "mcp.json 的规范版本不受支持或与 manifest 不匹配，已禁用 MCP 组件"
+                "mcp.json specification version is unsupported or does not match the manifest; MCP is disabled"
             },
         );
     }
@@ -288,7 +298,7 @@ fn envelope(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>,
             RuleId::McpVersionMatch,
             Some("/$schema"),
             "MCP_VERSION_MISMATCH",
-            "mcp.json 的规范版本与 manifest 不匹配，已禁用 MCP 组件",
+            "mcp.json specification version does not match the manifest; MCP is disabled",
         );
     }
     coverage(
@@ -332,7 +342,7 @@ fn server(
             name,
             Some(&pointer),
             "MCP_SERVER_NOT_OBJECT",
-            "MCP server 配置必须是对象",
+            "MCP server configuration must be an object",
         );
     };
     let Some(kind) = object.get("type").and_then(Value::as_str) else {
@@ -342,7 +352,7 @@ fn server(
             name,
             Some(&pointer),
             "MCP_SERVER_TYPE",
-            "MCP server 缺少有效 type",
+            "MCP server is missing a valid type",
         );
     };
     match kind {
@@ -354,7 +364,7 @@ fn server(
             name,
             Some(&pointer),
             "MCP_SERVER_TYPE",
-            "MCP server type 不受支持",
+            "MCP server type is unsupported",
         ),
     }
 }
@@ -379,7 +389,7 @@ fn stdio(
             name,
             Some(pointer),
             "MCP_STDIO_VARIANT",
-            "stdio server 字段不符合闭合 variant",
+            "stdio server fields do not match the closed variant",
         );
     }
     coverage(
@@ -409,7 +419,7 @@ fn stdio(
             name,
             Some(&format!("{pointer}/command")),
             "MCP_COMMAND_PATH",
-            "command 不得为绝对路径或父目录路径",
+            "command must not be an absolute path or a parent-directory path",
         );
     }
     if command.starts_with("./") {
@@ -448,7 +458,7 @@ fn stdio(
             Scope::Server(name.into()),
             Some(format!("{pointer}/command")),
             "AMBIGUOUS_COMMAND",
-            "裸 command 的单 token 语义无法静态确定",
+            "a bare command's single-token meaning cannot be determined statically",
         );
         coverage(
             plugin,
@@ -526,7 +536,7 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
             name,
             Some(pointer),
             "MCP_REMOTE_VARIANT",
-            "远程 MCP server 字段不符合闭合 variant",
+            "remote MCP server fields do not match the closed variant",
         );
     }
     coverage(
@@ -545,7 +555,7 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
                 name,
                 Some(&format!("{pointer}/url")),
                 "MCP_URL",
-                "MCP URL 必须是无 userinfo 和 fragment 的绝对 HTTP(S) URL",
+                "MCP URL must be an absolute HTTP(S) URL without userinfo or a fragment",
             );
         }
         UrlCheck::Ambiguous => {
@@ -571,7 +581,7 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
                 name,
                 Some(&format!("{pointer}/url")),
                 "MCP_HTTPS",
-                "非 loopback MCP URL 必须使用 HTTPS",
+                "a non-loopback MCP URL must use HTTPS",
             );
         }
         UrlCheck::Ok => {
@@ -604,7 +614,7 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
                     name,
                     Some(&format!("{pointer}/headers/{}", escape(key))),
                     "MCP_HEADERS",
-                    "MCP headers 含无效字段或大小写重复字段",
+                    "MCP headers contain an invalid field or a case-insensitive duplicate",
                 );
             }
             if possible_secret(key, value.as_str().expect("checked")) {
@@ -615,7 +625,7 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
                     Scope::Server(name.into()),
                     Some(format!("{pointer}/headers/{}", escape(key))),
                     "POSSIBLE_SECRET",
-                    "header 名称可能表示秘密；请人工确认，报告未包含其值",
+                    "header name may indicate a secret; confirm it manually. This report does not include the value",
                 );
                 coverage(
                     plugin,
@@ -659,7 +669,7 @@ fn env_checks(
                 name,
                 Some(&format!("{pointer}/env/{}", escape(key))),
                 "RESERVED_ENV",
-                "env 不得覆盖保留变量",
+                "env must not override a reserved variable",
             );
             return false;
         }
@@ -682,7 +692,7 @@ fn env_checks(
                 } else {
                     "ENV_CASE"
                 },
-                "env 键的大小写在不同平台可能冲突",
+                "env key case may conflict across platforms",
             );
         }
         if possible_secret(key, value.as_str().expect("checked")) {
@@ -693,7 +703,7 @@ fn env_checks(
                 Scope::Server(name.into()),
                 Some(format!("{pointer}/env/{}", escape(key))),
                 "POSSIBLE_SECRET",
-                "env 名称可能表示秘密；请人工确认，报告未包含其值",
+                "env name may indicate a secret; confirm it manually. This report does not include the value",
             );
             coverage(
                 plugin,
@@ -738,7 +748,7 @@ fn cwd_check(
             name,
             Some(&format!("{pointer}/cwd")),
             "CWD_FORM",
-            "cwd 必须为 ./、${PLUGIN_ROOT} 或 ${PLUGIN_DATA} 形态",
+            "cwd must be ./, ${PLUGIN_ROOT}, or ${PLUGIN_DATA}",
         );
         return;
     }
@@ -771,7 +781,7 @@ fn cwd_check(
             errors,
             root,
             "PATH_ENCODING",
-            "包根路径不能以 UTF-8 表示，无法展开 PLUGIN_ROOT",
+            "package root path is not valid UTF-8, so PLUGIN_ROOT cannot be expanded",
         );
         coverage(
             plugin,
@@ -836,7 +846,7 @@ fn inside(
                 name,
                 Some(&format!("{pointer}/{field}")),
                 "SERVER_OUTSIDE_ROOT",
-                "MCP server 路径位于包根之外",
+                "MCP server path is outside the package root",
             );
             PathCheck::Outside
         }
@@ -855,12 +865,17 @@ fn inside(
                 Scope::Server(name.into()),
                 Some(format!("{pointer}/{field}")),
                 "PATH_UNRESOLVED",
-                "MCP 路径尚无法解析，未将其判定为越界",
+                "MCP path cannot be resolved yet and was not treated as an escape",
             );
             PathCheck::Unresolved
         }
         Err(_) => {
-            error(errors, &path, "MCP_PATH_IO", "无法解析 MCP server 路径");
+            error(
+                errors,
+                &path,
+                "MCP_PATH_IO",
+                "cannot resolve the MCP server path",
+            );
             coverage(
                 plugin,
                 RuleId::PathServerEscape,

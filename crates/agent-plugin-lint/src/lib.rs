@@ -13,12 +13,14 @@
 //! 判定；本 crate 负责 Plugin manifest、发现、包含边界和 MCP 编排。原库未被
 //! 修改，来源、快照与差异记录在仓库 `research/PROVENANCE.md`。公开 registry
 //! 可用于将 1.0.0 原规则表与报告 coverage 对照，不能据此推断每条均有静态实现。
+pub mod cli;
 mod containment;
 mod expansion;
 mod json;
 mod lint;
 mod manifest;
 mod mcp;
+pub mod output;
 mod report;
 mod rules;
 mod skills;

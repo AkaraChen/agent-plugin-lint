@@ -43,13 +43,24 @@ ap-lint path/to/plugin --strict
 
 `--strict` also fails on advisories and unchecked static checks for concrete targets. Run `ap-lint --help` for all options.
 
-Diagnostics and CLI help are currently in Chinese.
+Diagnostics and CLI help are in English.
 
 Excerpt from scanning the `frontend` plugin in [eric-way](https://github.com/AkaraChen/eric-way):
 
 ```text
-插件根：.（状态：accepted）
-AP-PATH-RESOURCE-ESCAPE skills/e2e-testing/references/docker.md §4.1 RESOURCE_OUTSIDE_ROOT [.] field=/ hint=无：资源路径位于包根之外，访问时会被拒绝
+plugin
+  root: .
+  status: accepted
+
+finding
+  rule: AP-PATH-RESOURCE-ESCAPE
+  path: skills/e2e-testing/references/docker.md
+  spec: §4.1
+  radius: ignored
+  effect: deny-path
+  scope: path skills/e2e-testing/references/docker.md
+  evidence: RESOURCE_OUTSIDE_ROOT
+  message: access to this resource path is denied because it is outside the package root
 ```
 
 This symlink points outside the plugin root. Under §4.1, a client must deny access to this resource path. The scan exits with code `1`.

@@ -219,7 +219,8 @@ fn deep_valid_json_is_a_representation_error_with_an_accurate_message() {
     ));
     assert_eq!(report.exit_code, 2);
     assert!(report.errors.iter().any(|error| {
-        error.code == "MANIFEST_JSON_REPRESENTATION" && error.message.contains("数值范围或嵌套深度")
+        error.code == "MANIFEST_JSON_REPRESENTATION"
+            && error.message.contains("numeric range or nesting depth")
     }));
     assert!(
         !report.plugins[0]

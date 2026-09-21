@@ -29,7 +29,7 @@ pub fn lint_path(path: &Path, options: LintOptions) -> Report {
             &mut report.errors,
             path,
             "PATH_ENCODING",
-            "路径不能以 UTF-8 表示",
+            "path is not valid UTF-8",
         );
         finish_report(&mut report);
         return report;
@@ -43,7 +43,7 @@ pub fn lint_path(path: &Path, options: LintOptions) -> Report {
                     &mut report.errors,
                     &root,
                     "DISCOVERY_AMBIGUOUS_ROOT",
-                    "多个逻辑包根指向同一真实目录",
+                    "multiple logical package roots point at the same real directory",
                 );
             }
             Ok(_) => {
@@ -56,7 +56,7 @@ pub fn lint_path(path: &Path, options: LintOptions) -> Report {
                 &mut report.errors,
                 &root,
                 "ROOT_UNRESOLVED",
-                "无法解析包根目录",
+                "cannot resolve the package root",
             ),
         }
     }
@@ -93,11 +93,21 @@ fn select_roots(path: &Path, mode: InputMode, errors: &mut Vec<ToolError>) -> Ve
     let metadata = match fs::metadata(path) {
         Ok(metadata) if metadata.is_dir() => metadata,
         Ok(_) => {
-            error(errors, path, "INPUT_NOT_DIRECTORY", "输入路径必须是目录");
+            error(
+                errors,
+                path,
+                "INPUT_NOT_DIRECTORY",
+                "input path must be a directory",
+            );
             return vec![];
         }
         Err(_) => {
-            error(errors, path, "INPUT_UNREADABLE", "无法读取输入目录");
+            error(
+                errors,
+                path,
+                "INPUT_UNREADABLE",
+                "cannot read the input directory",
+            );
             return vec![];
         }
     };
@@ -111,7 +121,7 @@ fn select_roots(path: &Path, mode: InputMode, errors: &mut Vec<ToolError>) -> Ve
                     errors,
                     path,
                     "DISCOVERY_EMPTY_COLLECTION",
-                    "集合模式没有直接子包",
+                    "collection mode found no direct child packages",
                 );
             }
             children
@@ -134,7 +144,7 @@ fn select_roots(path: &Path, mode: InputMode, errors: &mut Vec<ToolError>) -> Ve
                     errors,
                     path,
                     "DISCOVERY_AMBIGUOUS",
-                    "自动模式未找到包或完整集合",
+                    "auto mode found neither a package nor a complete collection",
                 );
                 return vec![];
             }
@@ -156,7 +166,7 @@ fn select_roots(path: &Path, mode: InputMode, errors: &mut Vec<ToolError>) -> Ve
                     errors,
                     path,
                     "DISCOVERY_AMBIGUOUS",
-                    "自动模式的直接子目录不是完整集合",
+                    "auto mode found direct children that are not a complete collection",
                 );
                 vec![]
             }
@@ -168,7 +178,12 @@ fn direct_children(path: &Path, errors: &mut Vec<ToolError>) -> Vec<PathBuf> {
     let entries = match fs::read_dir(path) {
         Ok(entries) => entries,
         Err(_) => {
-            error(errors, path, "DISCOVERY_READ", "无法枚举输入目录");
+            error(
+                errors,
+                path,
+                "DISCOVERY_READ",
+                "cannot enumerate the input directory",
+            );
             return vec![];
         }
     };
@@ -179,7 +194,7 @@ fn direct_children(path: &Path, errors: &mut Vec<ToolError>) -> Vec<PathBuf> {
                 errors,
                 &entry.path(),
                 "PATH_ENCODING",
-                "目录项路径不能以 UTF-8 表示",
+                "directory entry path is not valid UTF-8",
             ),
             Ok(entry) => match fs::metadata(entry.path()) {
                 Ok(metadata) if metadata.is_dir() => children.push(entry.path()),
@@ -188,10 +203,15 @@ fn direct_children(path: &Path, errors: &mut Vec<ToolError>) -> Vec<PathBuf> {
                     errors,
                     &entry.path(),
                     "DISCOVERY_ENTRY",
-                    "无法读取目录项类型",
+                    "cannot read the directory entry type",
                 ),
             },
-            Err(_) => error(errors, path, "DISCOVERY_ENTRY", "无法读取目录项"),
+            Err(_) => error(
+                errors,
+                path,
+                "DISCOVERY_ENTRY",
+                "cannot read the directory entry",
+            ),
         }
     }
     children.sort();
@@ -202,8 +222,13 @@ fn manifest_marker(root: &Path) -> Result<bool, ToolError> {
     match fs::read_dir(root) {
         Ok(entries) => {
             for entry in entries {
-                let entry = entry
-                    .map_err(|_| tool_error(root, "MANIFEST_ENUMERATE", "无法枚举包根目录"))?;
+                let entry = entry.map_err(|_| {
+                    tool_error(
+                        root,
+                        "MANIFEST_ENUMERATE",
+                        "cannot enumerate the package root",
+                    )
+                })?;
                 if entry.file_name() == "plugin.json" {
                     return Ok(true);
                 }
@@ -211,7 +236,11 @@ fn manifest_marker(root: &Path) -> Result<bool, ToolError> {
             Ok(false)
         }
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(false),
-        Err(_) => Err(tool_error(root, "MANIFEST_ENUMERATE", "无法枚举包根目录")),
+        Err(_) => Err(tool_error(
+            root,
+            "MANIFEST_ENUMERATE",
+            "cannot enumerate the package root",
+        )),
     }
 }
 
@@ -227,7 +256,7 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
             return outcome(location_report(
                 root_name,
                 "MANIFEST_MISSING",
-                "包根缺少 plugin.json",
+                "package root has no plugin.json",
             ));
         }
         Err(tool_error) => {
@@ -239,20 +268,27 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
     }
     let root_canonical = match fs::canonicalize(root) {
         Ok(root) => root,
-        Err(_) => return outcome_error(root_name, root, "ROOT_UNRESOLVED", "无法解析包根目录"),
+        Err(_) => {
+            return outcome_error(
+                root_name,
+                root,
+                "ROOT_UNRESOLVED",
+                "cannot resolve the package root",
+            );
+        }
     };
     let manifest_path = root.join("plugin.json");
     match fs::symlink_metadata(&manifest_path) {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => outcome(location_report(
             root_name,
             "MANIFEST_MISSING",
-            "包根缺少 plugin.json",
+            "package root has no plugin.json",
         )),
         Err(_) => outcome_error(
             root_name,
             &manifest_path,
             "MANIFEST_METADATA",
-            "无法读取 plugin.json 元数据",
+            "cannot read plugin.json metadata",
         ),
         Ok(_) => {
             let canonical_manifest = match fs::canonicalize(&manifest_path) {
@@ -261,7 +297,7 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                     return outcome(location_report(
                         root_name,
                         "MANIFEST_UNRESOLVED",
-                        "plugin.json 链接无法解析",
+                        "plugin.json link cannot be resolved",
                     ));
                 }
                 Err(_) => {
@@ -269,7 +305,7 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                         root_name,
                         &manifest_path,
                         "MANIFEST_CANONICALIZE",
-                        "无法解析 plugin.json",
+                        "cannot resolve plugin.json",
                     );
                 }
             };
@@ -295,20 +331,20 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                                 root_name,
                                 &manifest_path,
                                 "MANIFEST_JSON_REPRESENTATION",
-                                "plugin.json 超出当前解析器表示能力（如数值范围或嵌套深度）",
+                                "plugin.json exceeds this parser's representation limits (numeric range or nesting depth)",
                             ),
                         },
                         Err(crate::containment::ReadError::InputChanged) => outcome_error(
                             root_name,
                             &manifest_path,
                             "INPUT_CHANGED",
-                            "读取 plugin.json 时输入发生变化",
+                            "plugin.json changed while it was being read",
                         ),
                         Err(crate::containment::ReadError::Unsafe) => outcome_error(
                             root_name,
                             &manifest_path,
                             "MANIFEST_READ",
-                            "plugin.json 不是可安全读取的普通文件",
+                            "plugin.json is not a regular file that can be read safely",
                         ),
                         Err(crate::containment::ReadError::Unsupported) => {
                             outcome_safe_read_unsupported(root_name, &manifest_path)
@@ -319,7 +355,7 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                                 root_name,
                                 &canonical_manifest,
                                 "MANIFEST_READ",
-                                "无法读取 plugin.json 内容",
+                                "cannot read plugin.json",
                             )
                         }
                     }
@@ -327,13 +363,13 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                 Ok(_) => outcome(location_report(
                     root_name,
                     "MANIFEST_NOT_REGULAR",
-                    "plugin.json 必须是普通文件",
+                    "plugin.json must be a regular file",
                 )),
                 Err(_) => outcome_error(
                     root_name,
                     &canonical_manifest,
                     "MANIFEST_METADATA",
-                    "无法读取 plugin.json 元数据",
+                    "cannot read plugin.json metadata",
                 ),
             }
         }
@@ -415,7 +451,7 @@ fn from_validation(
             "plugin.json".into(),
             Scope::Plugin,
             "DUPLICATE_JSON_KEY",
-            "JSON 对象存在重复键；后续校验按最后一个值进行",
+            "JSON object has duplicate keys; later checks use the last value",
         );
     }
     let mut errors = vec![];
@@ -474,7 +510,7 @@ fn from_validation(
                     "skills".into(),
                     Scope::ComponentType("skills".into()),
                     "SKILL_UNCHECKED",
-                    "部分 skill 规则未检查，不能视为完全合规",
+                    "some skill rules were not checked and must not be treated as fully compliant",
                 );
             }
         }
@@ -738,7 +774,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 errors,
                 &skills,
                 "SKILLS_METADATA_IO",
-                "无法读取 skills 元数据",
+                "cannot read skills metadata",
             );
             plugin.coverage.push(Coverage {
                 rule_id: RuleId::SkillConformance.as_str().into(),
@@ -774,7 +810,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                     "skills".into(),
                     Scope::ComponentType("skills".into()),
                     "SKILLS_WRONG_KIND",
-                    "skills 必须是目录，已禁用 skills 组件",
+                    "skills must be a directory; the skills component is disabled",
                 );
                 return;
             }
@@ -783,7 +819,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                     errors,
                     &skills,
                     "SKILLS_METADATA_IO",
-                    "无法读取 skills 元数据",
+                    "cannot read skills metadata",
                 );
                 plugin.coverage.push(Coverage {
                     rule_id: RuleId::SkillConformance.as_str().into(),
@@ -801,7 +837,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 "skills".into(),
                 Scope::ComponentType("skills".into()),
                 "SKILLS_OUTSIDE_ROOT",
-                "skills 位于包根之外，已禁用 skills 组件",
+                "skills is outside the package root; the skills component is disabled",
             );
             return;
         }
@@ -810,7 +846,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 errors,
                 &skills,
                 "SKILLS_CANONICALIZE",
-                "无法解析 skills 路径",
+                "cannot resolve the skills path",
             );
             return;
         }
@@ -819,7 +855,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 errors,
                 &skills,
                 "SKILLS_CANONICALIZE",
-                "无法解析 skills 路径",
+                "cannot resolve the skills path",
             );
             return;
         }
@@ -831,7 +867,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 errors,
                 &skills_actual,
                 "SKILLS_READ_IO",
-                "无法枚举 skills 目录",
+                "cannot enumerate the skills directory",
             );
             plugin.coverage.push(Coverage {
                 rule_id: RuleId::SkillConformance.as_str().into(),
@@ -850,7 +886,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                     errors,
                     &skills_actual,
                     "SKILLS_ENTRY_IO",
-                    "无法读取 skills 目录项",
+                    "cannot read a skills directory entry",
                 );
                 continue;
             }
@@ -862,7 +898,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                     errors,
                     &entry.path(),
                     "PATH_ENCODING",
-                    "路径不能以 UTF-8 表示",
+                    "path is not valid UTF-8",
                 );
                 plugin.coverage.push(Coverage {
                     rule_id: RuleId::SkillConformance.as_str().into(),
@@ -885,7 +921,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                             errors,
                             &candidate,
                             "SKILL_DIRECTORY_METADATA_IO",
-                            "无法读取 skill 目录元数据",
+                            "cannot read skill directory metadata",
                         );
                         continue;
                     }
@@ -902,7 +938,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                             logical,
                             Scope::Skill(name),
                             "SKILL_OUTSIDE_ROOT",
-                            "skill 位于包根之外，已跳过该 skill",
+                            "skill is outside the package root; this skill was skipped",
                         );
                         plugin.coverage.push(Coverage {
                             rule_id: RuleId::SkillConformance.as_str().into(),
@@ -918,14 +954,14 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                             logical.clone(),
                             Scope::Path(logical.clone()),
                             "RESOURCE_OUTSIDE_ROOT",
-                            "资源路径位于包根之外，访问时会被拒绝",
+                            "access to this resource path is denied because it is outside the package root",
                         );
                     }
                     Err(_) => error(
                         errors,
                         &candidate.join("SKILL.md"),
                         "SKILL_METADATA_IO",
-                        "无法读取外部 SKILL.md 元数据",
+                        "cannot read metadata for the external SKILL.md",
                     ),
                 }
                 continue;
@@ -936,7 +972,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                     errors,
                     &candidate,
                     "SKILL_CANONICALIZE",
-                    "无法解析 skill 路径",
+                    "cannot resolve the skill path",
                 );
                 continue;
             }
@@ -951,7 +987,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                     errors,
                     &candidate,
                     "SKILL_ENUMERATE_IO",
-                    "无法枚举 skill 目录",
+                    "cannot enumerate the skill directory",
                 );
                 continue;
             }
@@ -978,7 +1014,12 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                             audit_resources(root, &directory, &logical, plugin, errors);
                         }
                         Err(crate::containment::ReadError::InputChanged) => {
-                            error(errors, &md, "INPUT_CHANGED", "读取 SKILL.md 时输入发生变化");
+                            error(
+                                errors,
+                                &md,
+                                "INPUT_CHANGED",
+                                "SKILL.md changed while it was being read",
+                            );
                             plugin.coverage.push(Coverage {
                                 rule_id: RuleId::SkillConformance.as_str().into(),
                                 target: md_logical,
@@ -987,7 +1028,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                             });
                         }
                         Err(crate::containment::ReadError::Unsafe) => {
-                            error(errors, &md, "SKILL_READ_IO", "无法安全读取 SKILL.md 内容");
+                            error(errors, &md, "SKILL_READ_IO", "cannot safely read SKILL.md");
                             plugin.coverage.push(Coverage {
                                 rule_id: RuleId::SkillConformance.as_str().into(),
                                 target: md_logical,
@@ -1000,7 +1041,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                                 errors,
                                 &md,
                                 "SAFE_READ_UNSUPPORTED",
-                                "当前平台无法安全读取 SKILL.md 内容",
+                                "this platform cannot safely read SKILL.md",
                             );
                             plugin.coverage.push(Coverage {
                                 rule_id: RuleId::SkillConformance.as_str().into(),
@@ -1012,7 +1053,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                         }
                         Err(read_error @ crate::containment::ReadError::Io(_)) => {
                             let _ = read_error.io_kind();
-                            error(errors, &md, "SKILL_READ_IO", "无法安全读取 SKILL.md 内容");
+                            error(errors, &md, "SKILL_READ_IO", "cannot safely read SKILL.md");
                             plugin.coverage.push(Coverage {
                                 rule_id: RuleId::SkillConformance.as_str().into(),
                                 target: md_logical,
@@ -1022,7 +1063,12 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                         }
                     },
                     Ok(false) => {}
-                    Err(_) => error(errors, &md, "SKILL_METADATA_IO", "无法读取 SKILL.md 元数据"),
+                    Err(_) => error(
+                        errors,
+                        &md,
+                        "SKILL_METADATA_IO",
+                        "cannot read SKILL.md metadata",
+                    ),
                 }
             }
             Ok(crate::containment::Resolution::Outside) => match external_file_is_skill(&md) {
@@ -1033,7 +1079,7 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                         md_logical.clone(),
                         Scope::Skill(name),
                         "SKILL_MD_OUTSIDE_ROOT",
-                        "SKILL.md 位于包根之外，已跳过该 skill",
+                        "SKILL.md is outside the package root; this skill was skipped",
                     );
                     plugin.coverage.push(Coverage {
                         rule_id: RuleId::SkillConformance.as_str().into(),
@@ -1049,14 +1095,14 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                         md_logical.clone(),
                         Scope::Path(md_logical),
                         "RESOURCE_OUTSIDE_ROOT",
-                        "资源路径位于包根之外，访问时会被拒绝",
+                        "access to this resource path is denied because it is outside the package root",
                     );
                 }
                 Err(_) => error(
                     errors,
                     &md,
                     "SKILL_METADATA_IO",
-                    "无法读取外部 SKILL.md 元数据",
+                    "cannot read metadata for the external SKILL.md",
                 ),
             },
             Ok(crate::containment::Resolution::Unresolved) => add_finding(
@@ -1065,9 +1111,14 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 md_logical,
                 Scope::Path(logical.clone()),
                 "SKILL_MD_UNRESOLVED",
-                "SKILL.md 无法解析，未检查该路径",
+                "SKILL.md cannot be resolved; this path was not checked",
             ),
-            Err(_) => error(errors, &md, "SKILL_CANONICALIZE", "无法解析 SKILL.md 路径"),
+            Err(_) => error(
+                errors,
+                &md,
+                "SKILL_CANONICALIZE",
+                "cannot resolve the SKILL.md path",
+            ),
         }
     }
 }
@@ -1126,7 +1177,12 @@ fn audit_dir(
     let actual = match fs::canonicalize(dir) {
         Ok(x) => x,
         Err(_) => {
-            error(errors, dir, "RESOURCE_CANONICALIZE", "无法解析资源目录");
+            error(
+                errors,
+                dir,
+                "RESOURCE_CANONICALIZE",
+                "cannot resolve the resource directory",
+            );
             return;
         }
     };
@@ -1137,7 +1193,7 @@ fn audit_dir(
             errors,
             dir,
             "RESOURCE_OUTSIDE_ROOT",
-            "资源目录位于包根之外，未枚举其内容",
+            "resource directory is outside the package root; its contents were not enumerated",
         );
         return;
     }
@@ -1147,7 +1203,12 @@ fn audit_dir(
     let entries = match fs::read_dir(dir) {
         Ok(x) => x,
         Err(_) => {
-            error(errors, dir, "RESOURCE_READ_IO", "无法枚举资源目录");
+            error(
+                errors,
+                dir,
+                "RESOURCE_READ_IO",
+                "cannot enumerate the resource directory",
+            );
             return;
         }
     };
@@ -1155,7 +1216,12 @@ fn audit_dir(
         let entry = match entry {
             Ok(x) => x,
             Err(_) => {
-                error(errors, dir, "RESOURCE_ENTRY_IO", "无法读取资源目录项");
+                error(
+                    errors,
+                    dir,
+                    "RESOURCE_ENTRY_IO",
+                    "cannot read a resource directory entry",
+                );
                 continue;
             }
         };
@@ -1163,7 +1229,7 @@ fn audit_dir(
         let name = match entry.file_name().into_string() {
             Ok(x) => x,
             Err(_) => {
-                error(errors, &path, "PATH_ENCODING", "路径不能以 UTF-8 表示");
+                error(errors, &path, "PATH_ENCODING", "path is not valid UTF-8");
                 continue;
             }
         };
@@ -1175,7 +1241,7 @@ fn audit_dir(
                 lp.clone(),
                 Scope::Path(lp.clone()),
                 "RESOURCE_OUTSIDE_ROOT",
-                "资源路径位于包根之外，访问时会被拒绝",
+                "access to this resource path is denied because it is outside the package root",
             ),
             Ok(crate::containment::Resolution::Inside(real)) => {
                 plugin.coverage.push(Coverage {
@@ -1189,7 +1255,12 @@ fn audit_dir(
                         audit_dir(root, &path, &lp, plugin, seen, errors)
                     }
                     Ok(_) => {}
-                    Err(_) => error(errors, &path, "RESOURCE_METADATA_IO", "无法读取资源元数据"),
+                    Err(_) => error(
+                        errors,
+                        &path,
+                        "RESOURCE_METADATA_IO",
+                        "cannot read resource metadata",
+                    ),
                 }
             }
             Ok(crate::containment::Resolution::Unresolved) => add_finding(
@@ -1198,9 +1269,14 @@ fn audit_dir(
                 lp.clone(),
                 Scope::Path(lp),
                 "RESOURCE_UNRESOLVED",
-                "资源路径无法解析，未检查该路径",
+                "resource path cannot be resolved; this path was not checked",
             ),
-            Err(_) => error(errors, &path, "RESOURCE_CANONICALIZE", "无法解析资源路径"),
+            Err(_) => error(
+                errors,
+                &path,
+                "RESOURCE_CANONICALIZE",
+                "cannot resolve the resource path",
+            ),
         }
     }
 }
@@ -1213,7 +1289,7 @@ fn path_escape_report(root: String) -> PluginReport {
         root,
         RuleId::PathManifestEscape,
         "MANIFEST_OUTSIDE_ROOT",
-        "plugin.json 位于包根之外，未读取其内容",
+        "plugin.json is outside the package root; its contents were not read",
     )
 }
 fn one_finding_report(root: String, rule: RuleId, code: &str, message: &str) -> PluginReport {
@@ -1318,7 +1394,7 @@ fn outcome_safe_read_unsupported(root: String, path: &Path) -> PluginOutcome {
         errors: vec![tool_error(
             path,
             "SAFE_READ_UNSUPPORTED",
-            "当前平台无法安全读取 plugin.json 内容",
+            "this platform cannot safely read plugin.json",
         )],
     }
 }
