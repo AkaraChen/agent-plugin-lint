@@ -138,13 +138,15 @@ fn expansion_is_single_pass_and_runtime_fields_stay_opaque() {
     );
 }
 
+#[cfg(unix)]
 #[test]
-fn relative_cwd_expands_once_before_being_joined_to_root() {
+fn relative_cwd_expands_once_before_being_joined_to_canonical_root() {
     let temp = fixture(mcp(
         json!({"s":{"type":"stdio","command":"node", "cwd":"./${PLUGIN_ROOT}"}}),
     ));
-    let stripped = temp.path().strip_prefix("/").unwrap();
-    fs::create_dir_all(temp.path().join(stripped)).unwrap();
+    let canonical_root = fs::canonicalize(temp.path()).unwrap();
+    let stripped = canonical_root.strip_prefix("/").unwrap();
+    fs::create_dir_all(canonical_root.join(stripped)).unwrap();
     let r = report(&temp);
     assert_eq!(r.exit_code, 0);
     assert!(
@@ -153,6 +155,28 @@ fn relative_cwd_expands_once_before_being_joined_to_root() {
             .iter()
             .any(|c| c.rule_id == "AP-PATH-SERVER-ESCAPE" && c.status == CoverageStatus::Pass)
     );
+}
+
+#[cfg(windows)]
+#[test]
+fn relative_cwd_with_root_placeholder_is_path_io_on_windows() {
+    let temp = fixture(mcp(
+        json!({"s":{"type":"stdio","command":"node", "cwd":"./${PLUGIN_ROOT}"}}),
+    ));
+    let r = report(&temp);
+    assert_eq!(r.exit_code, 2);
+    assert!(r.errors.iter().any(|error| error.code == "MCP_PATH_IO"));
+    assert!(
+        r.plugins[0]
+            .coverage
+            .iter()
+            .any(|c| c.rule_id == "AP-PATH-SERVER-ESCAPE" && c.status == CoverageStatus::Unchecked)
+    );
+    assert!(!has(&r, "AP-PATH-SERVER-ESCAPE"));
+}
+
+#[test]
+fn replacement_text_is_not_expanded_again() {
     let parent = TempDir::new().unwrap();
     let root = parent.path().join("${PLUGIN_DATA}");
     fs::create_dir(&root).unwrap();
@@ -170,6 +194,12 @@ fn relative_cwd_expands_once_before_being_joined_to_root() {
     assert_eq!(
         r.exit_code, 0,
         "replacement text must not be expanded again"
+    );
+    assert!(
+        r.plugins[0]
+            .coverage
+            .iter()
+            .any(|c| c.rule_id == "AP-PATH-SERVER-ESCAPE" && c.status == CoverageStatus::Pass)
     );
 }
 

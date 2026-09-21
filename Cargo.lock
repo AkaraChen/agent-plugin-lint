@@ -15,6 +15,7 @@ dependencies = [
  "sha2",
  "tempfile",
  "url",
+ "windows-sys",
 ]
 
 [[package]]

@@ -20,7 +20,7 @@ Reports include the location, rule ID, specification section and affected scope:
 
 The linter reads local files, runs offline and does not execute plugin code.
 
-Platform verification: Linux verified; macOS and Windows not yet verified.
+CI checks passed on Linux, macOS and Windows; see [tested scope](REVIEW.md).
 
 ## Install
 

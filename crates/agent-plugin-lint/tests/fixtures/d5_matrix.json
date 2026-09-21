@@ -1,0 +1,1058 @@
+{
+  "source": "research/1.0.0.md §7.2.1, §9.1–§9.2",
+  "spec": "§7.2.1, §9.2",
+  "decision": "D5",
+  "specGroups": [
+    {
+      "source": "research/1.0.0.md §7.2.1 L325",
+      "spec": "§7.2.1 L325",
+      "decision": "D5",
+      "cases": [
+        "bare-node",
+        "bare-python3",
+        "bare-exe",
+        "dot-space",
+        "windows-drive-token",
+        "windows-backslash-token",
+        "unc-token",
+        "control-token",
+        "nul-token",
+        "whitespace-token",
+        "shell-token",
+        "quote-token",
+        "unicode-token",
+        "absolute-command",
+        "parent-command",
+        "slash-command",
+        "empty-command"
+      ]
+    },
+    {
+      "source": "research/1.0.0.md §7.2.1 L351",
+      "spec": "§7.2.1 L351",
+      "decision": "D5",
+      "cases": [
+        "http-localhost",
+        "http-loopback-v4",
+        "http-loopback-v6",
+        "http-public",
+        "http-short-v4",
+        "http-decimal-v4",
+        "http-octal-v4",
+        "http-hex-v4",
+        "http-mapped-v6",
+        "https-mapped-v6",
+        "http-percent-host",
+        "http-later-octal",
+        "http-later-hex",
+        "http-localhost-suffix",
+        "http-localhost-dot"
+      ]
+    },
+    {
+      "source": "research/1.0.0.md §9.1 L460; §9.2 L481",
+      "spec": "§9.1 L460; §9.2 L481",
+      "decision": "D5",
+      "cases": [
+        "env-reserved",
+        "env-reserved-data",
+        "env-case",
+        "env-case-data",
+        "env-case-collision",
+        "env-unicode",
+        "env-unicode-collision",
+        "env-normal-path",
+        "env-unicode-value-opaque",
+        "env-opaque-value"
+      ]
+    }
+  ],
+  "cases": [
+    {
+      "name": "bare-node",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "pass",
+      "reason": "COMMAND_BARE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "bare-python3",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "python3"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "pass",
+      "reason": "COMMAND_BARE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "bare-exe",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "tool-name.exe"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "pass",
+      "reason": "COMMAND_BARE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "dot-space",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "./bin/my server"
+          }
+        }
+      },
+      "create": [
+        "bin/my server"
+      ],
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "pass",
+      "reason": "COMMAND_CONTAINED",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "windows-drive-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "C:\\Tools\\node.exe"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "windows-backslash-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "bin\\server"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "unc-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "\\\\host\\share\\node.exe"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "control-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node\u0001"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "nul-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node\u0000"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "whitespace-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node --version"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "shell-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node;id"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "quote-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node\"x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "unicode-token",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "nødé"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_COMMAND",
+      "finding": "AP-ADVICE-AMBIGUOUS-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "absolute-command",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "/usr/bin/node"
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "fail",
+      "reason": "MCP_COMMAND_PATH",
+      "finding": "AP-MCP-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "parent-command",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "../node"
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "fail",
+      "reason": "MCP_COMMAND_PATH",
+      "finding": "AP-MCP-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "slash-command",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "bin/node"
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "fail",
+      "reason": "MCP_COMMAND_PATH",
+      "finding": "AP-MCP-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "empty-command",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": ""
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-COMMAND",
+      "target": "mcp.json#/mcpServers/case/command",
+      "status": "fail",
+      "reason": "MCP_COMMAND_PATH",
+      "finding": "AP-MCP-COMMAND",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L325"
+    },
+    {
+      "name": "http-localhost",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://localhost/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "pass",
+      "reason": "HTTPS_OR_LOOPBACK",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-loopback-v4",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://127.2.3.4/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "pass",
+      "reason": "HTTPS_OR_LOOPBACK",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-loopback-v6",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://[::1]/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "pass",
+      "reason": "HTTPS_OR_LOOPBACK",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-public",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://api.example/x"
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "fail",
+      "reason": "MCP_HTTPS",
+      "finding": "AP-MCP-HTTPS",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-short-v4",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://127.1/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-decimal-v4",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://2130706433/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-octal-v4",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://0177.0.0.1/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-hex-v4",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://0x7f.0x0.0x0.0x1/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-mapped-v6",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://[::ffff:127.0.0.1]/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "https-mapped-v6",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "https://[::ffff:127.0.0.1]/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-percent-host",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://[fe80::1%25eth0]/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-percent-encoded-loopback",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://%31%32%37.0.0.1/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-later-octal",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://127.0.0.01/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-later-hex",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://127.0.0.0x1/x"
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "unchecked",
+      "reason": "AMBIGUOUS_URL_HOST",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-localhost-suffix",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://localhost.example/x"
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "fail",
+      "reason": "MCP_HTTPS",
+      "finding": "AP-MCP-HTTPS",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "http-localhost-dot",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "sse",
+            "url": "http://localhost./x"
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-HTTPS",
+      "target": "mcp.json#/mcpServers/case/url",
+      "status": "fail",
+      "reason": "MCP_HTTPS",
+      "finding": "AP-MCP-HTTPS",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§7.2.1 L351"
+    },
+    {
+      "name": "env-reserved",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "PLUGIN_ROOT": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-RESERVED-ENV",
+      "target": "mcp.json#/mcpServers/case/env/PLUGIN_ROOT",
+      "status": "fail",
+      "reason": "RESERVED_ENV",
+      "finding": "AP-MCP-RESERVED-ENV",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-reserved-data",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "PLUGIN_DATA": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 1,
+      "strictExit": 1,
+      "rule": "AP-MCP-RESERVED-ENV",
+      "target": "mcp.json#/mcpServers/case/env/PLUGIN_DATA",
+      "status": "fail",
+      "reason": "RESERVED_ENV",
+      "finding": "AP-MCP-RESERVED-ENV",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-case",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "plugin_root": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-ADVICE-ENV-CASE",
+      "target": "mcp.json#/mcpServers/case/env/plugin_root",
+      "status": "fail",
+      "reason": "ENV_CASE",
+      "finding": "AP-ADVICE-ENV-CASE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-case-data",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "Plugin_Data": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-ADVICE-ENV-CASE",
+      "target": "mcp.json#/mcpServers/case/env/Plugin_Data",
+      "status": "fail",
+      "reason": "ENV_CASE",
+      "finding": "AP-ADVICE-ENV-CASE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-case-collision",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "PATH": "one",
+              "Path": "two"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-ADVICE-ENV-CASE",
+      "target": "mcp.json#/mcpServers/case/env/Path",
+      "status": "fail",
+      "reason": "ENV_CASE",
+      "finding": "AP-ADVICE-ENV-CASE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-unicode",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "PLUGıN_ROOT": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-ADVICE-ENV-CASE",
+      "target": "mcp.json#/mcpServers/case/env/PLUGıN_ROOT",
+      "status": "fail",
+      "reason": "ENV_CASE_UNCHECKED",
+      "finding": "AP-ADVICE-ENV-CASE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-unicode-single",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "模式": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-ADVICE-ENV-CASE",
+      "target": "mcp.json#/mcpServers/case/env/模式",
+      "status": "fail",
+      "reason": "ENV_CASE_UNCHECKED",
+      "finding": "AP-ADVICE-ENV-CASE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-unicode-collision",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "päth": "one",
+              "PÄTH": "two"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 1,
+      "rule": "AP-ADVICE-ENV-CASE",
+      "target": "mcp.json#/mcpServers/case/env/PÄTH",
+      "status": "fail",
+      "reason": "ENV_CASE_UNCHECKED",
+      "finding": "AP-ADVICE-ENV-CASE",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-normal-path",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "Path": "opaque"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-RESERVED-ENV",
+      "target": "mcp.json#/mcpServers/case/env",
+      "status": "pass",
+      "reason": "ENV_RESERVED_VALID",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481"
+    },
+    {
+      "name": "env-unicode-value-opaque",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "X": "路径 ../ ${HOME}"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-RESERVED-ENV",
+      "target": "mcp.json#/mcpServers/case/env",
+      "status": "pass",
+      "reason": "ENV_RESERVED_VALID",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481; §4.1 L64"
+    },
+    {
+      "name": "env-opaque-value",
+      "mcp": {
+        "$schema": "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json",
+        "mcpServers": {
+          "case": {
+            "type": "stdio",
+            "command": "node",
+            "env": {
+              "X": "../${HOME}/C:\\tmp"
+            }
+          }
+        }
+      },
+      "defaultExit": 0,
+      "strictExit": 0,
+      "rule": "AP-MCP-RESERVED-ENV",
+      "target": "mcp.json#/mcpServers/case/env",
+      "status": "pass",
+      "reason": "ENV_RESERVED_VALID",
+      "source": "research/1.0.0.md",
+      "decision": "D5",
+      "spec": "§9.1 L460; §9.2 L481; §4.1 L64"
+    }
+  ]
+}

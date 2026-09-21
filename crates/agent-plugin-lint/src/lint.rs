@@ -310,6 +310,9 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                             "MANIFEST_READ",
                             "plugin.json 不是可安全读取的普通文件",
                         ),
+                        Err(crate::containment::ReadError::Unsupported) => {
+                            outcome_safe_read_unsupported(root_name, &manifest_path)
+                        }
                         Err(read_error @ crate::containment::ReadError::Io(_)) => {
                             let _ = read_error.io_kind();
                             outcome_error(
@@ -584,16 +587,36 @@ fn annotate_unimplemented_context(
             }
         }
     }
-    if plugin
-        .coverage
-        .iter()
-        .any(|coverage| coverage.target.ends_with("/SKILL.md"))
-    {
+    // Description quality requires the body.  Do not add a manual result for
+    // a skill whose safe read failed: that would contradict its blocked
+    // frontmatter/field checks.
+    if plugin.coverage.iter().any(|coverage| {
+        coverage.rule_id == RuleId::AsDescription.as_str()
+            && coverage.target.ends_with("/SKILL.md")
+            && coverage.reason_code.as_deref() == Some("SKILL_LIBRARY")
+    }) {
         plugin.coverage.push(Coverage {
             rule_id: "AS-DESCRIPTION-QUALITY".into(),
             target: "skills".into(),
             status: CoverageStatus::Manual,
             reason_code: Some("QUALITY_MANUAL".into()),
+        });
+    }
+}
+
+fn block_unread_skill(plugin: &mut PluginReport, target: &str) {
+    for rule in [
+        RuleId::AsFrontmatter,
+        RuleId::AsName,
+        RuleId::AsDescription,
+        RuleId::AsOptionalFields,
+        RuleId::AsSizeGuidance,
+    ] {
+        plugin.coverage.push(Coverage {
+            rule_id: rule.as_str().into(),
+            target: target.into(),
+            status: CoverageStatus::Blocked,
+            reason_code: Some("SAFE_READ_UNSUPPORTED".into()),
         });
     }
 }
@@ -972,6 +995,21 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                                 reason_code: Some("SKILL_READ_IO".into()),
                             });
                         }
+                        Err(crate::containment::ReadError::Unsupported) => {
+                            error(
+                                errors,
+                                &md,
+                                "SAFE_READ_UNSUPPORTED",
+                                "当前平台无法安全读取 SKILL.md 内容",
+                            );
+                            plugin.coverage.push(Coverage {
+                                rule_id: RuleId::SkillConformance.as_str().into(),
+                                target: md_logical.clone(),
+                                status: CoverageStatus::Unchecked,
+                                reason_code: Some("SAFE_READ_UNSUPPORTED".into()),
+                            });
+                            block_unread_skill(plugin, &md_logical);
+                        }
                         Err(read_error @ crate::containment::ReadError::Io(_)) => {
                             let _ = read_error.io_kind();
                             error(errors, &md, "SKILL_READ_IO", "无法安全读取 SKILL.md 内容");
@@ -1265,6 +1303,25 @@ fn outcome_error(root: String, path: &Path, code: &str, message: &str) -> Plugin
         errors: vec![tool_error(path, code, message)],
     }
 }
+fn outcome_safe_read_unsupported(root: String, path: &Path) -> PluginOutcome {
+    let mut plugin = unread_plugin(root);
+    for coverage in &mut plugin.coverage {
+        coverage.status = if coverage.rule_id == RuleId::ManifestLocation.as_str() {
+            CoverageStatus::Unchecked
+        } else {
+            CoverageStatus::Blocked
+        };
+        coverage.reason_code = Some("SAFE_READ_UNSUPPORTED".into());
+    }
+    PluginOutcome {
+        plugin,
+        errors: vec![tool_error(
+            path,
+            "SAFE_READ_UNSUPPORTED",
+            "当前平台无法安全读取 plugin.json 内容",
+        )],
+    }
+}
 fn unread_plugin(root: String) -> PluginReport {
     PluginReport {
         root,
@@ -1276,7 +1333,8 @@ fn unread_plugin(root: String) -> PluginReport {
     }
 }
 fn unresolved_location(error: &std::io::Error) -> bool {
-    error.kind() == std::io::ErrorKind::NotFound || (cfg!(unix) && error.raw_os_error() == Some(40)) // ELOOP
+    error.kind() == std::io::ErrorKind::NotFound
+        || (cfg!(unix) && error.raw_os_error() == Some(libc::ELOOP))
 }
 
 fn finish_report(report: &mut Report) {
@@ -1450,4 +1508,230 @@ fn scope_key(scope: &Scope) -> (&str, Option<&str>) {
 }
 fn display(path: &Path) -> String {
     path.to_str().unwrap_or("<non-utf8-path>").into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    struct UnsupportedGuard;
+    impl UnsupportedGuard {
+        fn enable(path: PathBuf) -> Self {
+            crate::containment::set_test_force_unsupported(Some(path));
+            Self
+        }
+    }
+    impl Drop for UnsupportedGuard {
+        fn drop(&mut self) {
+            crate::containment::set_test_force_unsupported(None);
+        }
+    }
+    fn has_unchecked(coverage: &[Coverage], rule: RuleId, target: &str) -> bool {
+        coverage.iter().any(|coverage| {
+            coverage.rule_id == rule.as_str()
+                && coverage.target == target
+                && coverage.status == CoverageStatus::Unchecked
+                && coverage.reason_code.as_deref() == Some("SAFE_READ_UNSUPPORTED")
+        })
+    }
+    fn has_coverage(
+        coverage: &[Coverage],
+        rule: RuleId,
+        target: &str,
+        status: CoverageStatus,
+    ) -> bool {
+        coverage.iter().any(|coverage| {
+            coverage.rule_id == rule.as_str()
+                && coverage.target == target
+                && coverage.status == status
+                && coverage.reason_code.as_deref() == Some("SAFE_READ_UNSUPPORTED")
+        })
+    }
+    fn assert_final(report: &Report, rule: RuleId, target: &str, blocked_rule: RuleId) {
+        assert_eq!(report.exit_code, 2);
+        assert!(!report.complete);
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.code == "SAFE_READ_UNSUPPORTED")
+        );
+        assert!(report.plugins.iter().all(|plugin| {
+            plugin
+                .findings
+                .iter()
+                .all(|finding| !(finding.normative && finding.obligation == Obligation::Must))
+        }));
+        assert!(
+            report
+                .plugins
+                .iter()
+                .any(|plugin| has_unchecked(&plugin.coverage, rule, target))
+        );
+        assert!(report.plugins.iter().any(|plugin| {
+            has_coverage(
+                &plugin.coverage,
+                blocked_rule,
+                target,
+                CoverageStatus::Blocked,
+            )
+        }));
+        assert!(
+            report
+                .plugins
+                .iter()
+                .filter(|plugin| has_unchecked(&plugin.coverage, rule, target))
+                .all(|plugin| !plugin.coverage.iter().any(|coverage| {
+                    coverage.rule_id == rule.as_str()
+                        && coverage.target == target
+                        && coverage.status == CoverageStatus::Pass
+                }))
+        );
+        let json = serde_json::to_value(report).unwrap();
+        assert_eq!(json["exitCode"], 2);
+        assert_eq!(json["complete"], false);
+        assert!(
+            json["errors"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|error| error["code"] == "SAFE_READ_UNSUPPORTED")
+        );
+        assert!(json["plugins"].as_array().unwrap().iter().any(|plugin| {
+            plugin["coverage"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|coverage| {
+                    coverage["ruleId"] == rule.as_str()
+                        && coverage["target"] == target
+                        && coverage["status"] == "unchecked"
+                        && coverage["reasonCode"] == "SAFE_READ_UNSUPPORTED"
+                })
+        }));
+        assert!(json["plugins"].as_array().unwrap().iter().any(|plugin| {
+            plugin["coverage"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|coverage| {
+                    coverage["ruleId"] == blocked_rule.as_str()
+                        && coverage["target"] == target
+                        && coverage["status"] == "blocked"
+                        && coverage["reasonCode"] == "SAFE_READ_UNSUPPORTED"
+                })
+        }));
+    }
+
+    #[test]
+    fn safe_read_unsupported_manifest_blocks_only_its_plugin() {
+        let temp = TempDir::new().unwrap();
+        let bad = temp.path().join("bad");
+        let good = temp.path().join("good");
+        fs::create_dir(&bad).unwrap();
+        fs::create_dir(&good).unwrap();
+        fs::write(
+            bad.join("plugin.json"),
+            "{ manifest sentinel is invalid JSON",
+        )
+        .unwrap();
+        fs::write(
+            good.join("plugin.json"),
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"good"}"#,
+        )
+        .unwrap();
+        let _guard = UnsupportedGuard::enable(bad.join("plugin.json"));
+        let report = lint_path(
+            temp.path(),
+            LintOptions {
+                mode: InputMode::Collection,
+                strict: false,
+            },
+        );
+        assert_final(
+            &report,
+            RuleId::ManifestLocation,
+            "plugin.json",
+            RuleId::ManifestJson,
+        );
+        let good_plugin = report
+            .plugins
+            .iter()
+            .find(|plugin| plugin.root == "good")
+            .unwrap();
+        assert!(good_plugin.coverage.iter().any(|coverage| {
+            coverage.rule_id == RuleId::ManifestJson.as_str()
+                && coverage.status == CoverageStatus::Pass
+        }));
+    }
+
+    #[test]
+    fn safe_read_unsupported_skill_blocks_its_fields_but_not_mcp() {
+        let temp = TempDir::new().unwrap();
+        fs::write(
+            temp.path().join("plugin.json"),
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"a"}"#,
+        )
+        .unwrap();
+        let skill = temp.path().join("skills/a");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: [invalid YAML sentinel\n---\n",
+        )
+        .unwrap();
+        fs::write(
+            temp.path().join("mcp.json"),
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/mcp.schema.json","mcpServers":{}}"#,
+        )
+        .unwrap();
+        let _guard = UnsupportedGuard::enable(skill.join("SKILL.md"));
+        let report = lint_path(temp.path(), LintOptions::default());
+        assert_final(
+            &report,
+            RuleId::SkillConformance,
+            "skills/a/SKILL.md",
+            RuleId::AsFrontmatter,
+        );
+        assert!(report.plugins[0].coverage.iter().any(|coverage| {
+            coverage.rule_id == RuleId::McpEnvelope.as_str()
+                && coverage.status == CoverageStatus::Pass
+        }));
+    }
+
+    #[test]
+    fn safe_read_unsupported_mcp_blocks_its_envelope_but_not_skill() {
+        let temp = TempDir::new().unwrap();
+        fs::write(
+            temp.path().join("plugin.json"),
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"a"}"#,
+        )
+        .unwrap();
+        let skill = temp.path().join("skills/a");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(
+            skill.join("SKILL.md"),
+            "---\nname: a\ndescription: valid\n---\nbody\n",
+        )
+        .unwrap();
+        fs::write(
+            temp.path().join("mcp.json"),
+            "{ mcp sentinel is invalid JSON",
+        )
+        .unwrap();
+        let _guard = UnsupportedGuard::enable(temp.path().join("mcp.json"));
+        let report = lint_path(temp.path(), LintOptions::default());
+        assert_final(
+            &report,
+            RuleId::McpEnvelope,
+            "mcp.json",
+            RuleId::McpServerVariant,
+        );
+        assert!(report.plugins[0].coverage.iter().any(|coverage| {
+            coverage.rule_id == RuleId::AsFrontmatter.as_str()
+                && coverage.target == "skills/a/SKILL.md"
+                && coverage.status == CoverageStatus::Pass
+        }));
+    }
 }

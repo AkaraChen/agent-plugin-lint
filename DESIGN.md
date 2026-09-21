@@ -37,7 +37,7 @@ crates/agent-plugin-lint/              # lib + ap-lint
 
 ## 3. skill 库的接口与移植
 
-核心 API：`validate_source(source: &str, directory_name: &str) -> SkillReport`。plugin 侧完成发现、包含检查和读取，仅把文本及逻辑目录名传入；不会让 skill 库重新打开越界路径。另保留直接目录校验、read_properties、to_prompt 的便利 API，IO 用独立 Result 错误，不能冒充 YAML 不合法。保留旧实现来源说明及 XML 转义测试，不承诺旧包 ABI/API 完全兼容。
+核心 API：`validate_source(source: &str, directory_name: &str) -> SkillReport`。plugin 侧完成发现、包含检查和读取，仅把文本及逻辑目录名传入；不会让 skill 库重新打开越界路径。另保留直接目录校验、read_properties、to_prompt 的便利 API，IO 用独立 Result 错误，不能冒充 YAML 不合法。直接目录校验在读取前检查目录名能否表示为UTF-8，不可表示就返回 NonUtf8Directory；这一入口检查不依赖文件系统允许创建该名字。保留旧实现来源说明及 XML 转义测试，不承诺旧包 ABI/API 完全兼容。
 
 ```rust
 pub enum SkillRule { Frontmatter, Name, Description, OptionalFields, SizeGuidance }
@@ -81,7 +81,7 @@ Report 字段：schemaVersion=1、toolVersion、rulesetVersion、specVersion=1.0
 
 排序：plugin root；finding 按 path/pointer/ruleId/scope/effect；coverage 按 ruleId/target/status；errors 按 path/code。无时间戳。同一输入、平台、版本 JSON 两次运行逐字节相同。稳定消费者依赖枚举、ID、证据码，不能解析人类消息。规范解释变化升 rulesetVersion。
 
-D4 尚待飞鸢正式裁决，本轮可审阅默认：确定的包侧 normative MUST 全部使退出 1，包含 ignored；只有 advisory 返回 0。`--strict` 额外拦截 advisory 与选定静态规则的 unchecked；manual/runtime/not-applicable/blocked 不因本身导致失败。末尾 registry 中没有目标级执行记录的包侧条目标 `unchecked/RULE_NOT_EVALUATED`，不能据缺记录推断目标不存在。这类索引占位未纳入 strict 的选择；具体目标上的静态 unchecked 仍纳入，不能用占位例外掩盖实际能力缺口。这只是 CI 政策，不提升半径。无找到包、IO/参数/歧义返回 2。
+D4 已于2026-09-21定案：确定的包侧 normative MUST 全部使退出 1，包含 ignored；只有 advisory 返回 0。`--strict` 额外拦截 advisory 与选定静态规则的 unchecked；manual/runtime/not-applicable/blocked 不因本身导致失败。末尾 registry 中没有目标级执行记录的包侧条目标 `unchecked/RULE_NOT_EVALUATED`，不能据缺记录推断目标不存在。这类索引占位未纳入 strict 的选择；具体目标上的静态 unchecked 仍纳入，不能用占位例外掩盖实际能力缺口。这只是 CI 政策，不提升半径。无找到包、IO/参数/歧义返回 2。
 
 ## 5. manifest 与目录发现
 
@@ -95,7 +95,7 @@ auto 先枚举精确 plugin.json（坏 JSON、目录、断链也算入口）；�
 
 ## 6. 文件系统包含与安全读取
 
-根以 canonical `PathBuf` 保存；调用分支区分 manifest、固定组件、skill、server command/cwd、resource，传入对应 Scope/Effect。`Resolution` 为 Inside(PathBuf)/Outside/Unresolved，`resolve` 的 IO 错误保留为 Result；`ReadError` 区分 InputChanged/Unsafe/Io。外部路径只读取判定所需元数据，不读正文或枚举外部目录。
+根以 canonical `PathBuf` 保存；调用分支区分 manifest、固定组件、skill、server command/cwd、resource，传入对应 Scope/Effect。`Resolution` 为 Inside(PathBuf)/Outside/Unresolved，`resolve` 的 IO 错误保留为 Result；`ReadError` 区分 InputChanged/Unsafe/Unsupported/Io。外部路径只读取判定所需元数据，不读正文或枚举外部目录。
 
 保留 `link/..` 原始路径交内核 `std::fs::canonicalize`，禁止先 components 折叠或词法 normalize；Rust canonicalize 在本平台实测 link/.. 与内核打开结果一致后方可依赖。比较 canonical Path 的 `starts_with`（组件级），禁止字符串前缀。根可为 symlink，根目标定义包边界。不存在/断链/循环不能一律称逃逸。
 
@@ -103,13 +103,17 @@ auto 先枚举精确 plugin.json（坏 JSON、目录、断链也算入口）；�
 
 资源在安全 skill 子树内递归检查文件系统链接，目录真实身份集防循环；同一链接入口先检查包含再去重。断链资源给 unresolved，固定断链给 kind；权限错误给 IO。安全读取可在打开前后重核路径/文件身份，变化返回 InputChanged；仍不是原子快照或沙箱。CLI 对恶意设备/FIFO 不阻塞读，只读已确认普通文件。Windows/junction/挂载/竞态无法在 Linux 测试替代，明确限制。
 
+D8 安全读取补充：每次操作入口 canonicalize 根，整个读取期间固定该边界；文件与根使用相同平台路径表示，不能因 Windows extended-length 前缀或 macOS `/var` 别名误报。Unix 比较 dev/ino、长度、mtime 与 ctime（含纳秒），并保持 O_NONBLOCK。Windows 使用原生句柄查询 volume serial + 128-bit FileIdInfo 及 FileBasicInfo 的 ChangeTime，结合长度/修改时间；检查前身份的句柄持有至操作结束，避免删除后 ID 重用。禁止以 len/mtime 作为 Windows 身份检查的静默替代。能力不可用返回 Unsupported，报告工具错误 `SAFE_READ_UNSUPPORTED`、退出2，并在相关目标 coverage 标 unchecked/同原因码；不得继续解析或称为包侧违规。原生文件系统竞态检查仍非原子快照，不承诺抵御所有并发改写。测试保留 InputChanged 精确断言，增加同长度/恢复mtime的替换和改写；平台特有测试必须原生 CI 执行。Windows接口依据：[FILE_ID_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_id_info)、[FILE_BASIC_INFO](https://learn.microsoft.com/en-us/windows/win32/api/winbase/ns-winbase-file_basic_info)、[GetFileInformationByHandleEx](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-getfileinformationbyhandleex)，不能从Linux元数据测试推导Windows行为。
+
+Windows 原生 CI 35601200199 已证实：同长度原地改写并恢复 mtime 时，文件 ID、ChangeTime、长度与修改时间可全部不变，不能以这些字段证明正文未改。首次读取及 AfterRead 检查之后，必须从已验证的正文句柄 rewind 并复读字节，与首次文本逐字节比较；不一致返回 InputChanged。复读前后各执行完整路径/guard/read/path-handle身份检查；不重复测试 hook、不重新打开任意外部正文。普通读取IO仍是操作错误。此检测不能提供原子快照或覆盖所有并发调度。
+
 ## 7. MCP 与 extensions
 
 MCP envelope 仅检查顶层；每 entry 独立闭合 union（Stdio/StreamableHttp/Sse）。坏 entry 不扩大到整类，坏 envelope/版本才禁 MCP，skills 继续（§7.2.2、§10.1）。不限制 server key 的 plugin 命名规则。
 
-command 不执行、不展开。./ 可包含空格；裸名含空白或 shell 标点欠定，advisory + unchecked。明确绝对/../ 路径违规。cwd 仅三种正文形式；ROOT 可求真实包含；DATA 未知或混合未知占位符只记 runtime，禁止假造目录或凭 .. 定罪。args/env 始终 opaque。
+command 不执行、不展开。./ 可包含空格；裸名仅对非空 ASCII 字母/数字与 `._+-` 组成的保守核心判定已检，其他 token 字符（包括空白、控制字符、引号/shell标点、冒号/反斜杠、Unicode）欠定，advisory + unchecked，strict拦截。此范围是D5检查能力边界，不是另造规范字符白名单；不得对范围外字符直接判MUST违规。明确绝对/../及非./的斜杠路径仍按正文判违规。cwd 仅三种正文形式；ROOT 可求真实包含；DATA 未知或混合未知占位符只记 runtime，禁止假造目录或凭 .. 定罪。args/env 始终 opaque。
 
-expansion 对原串一次扫描，每个精确 ROOT/DATA 占位符替换一次；replacement 不再扫描；未知字面保留（§9.2）。command/url/header/env key 不扩展。只禁精确保留 env key；大小写等价依平台，提示而不定罪。
+expansion 对原串一次扫描，每个精确 ROOT/DATA 占位符替换一次；replacement 不再扫描；未知字面保留（§9.2）。command/url/header/env key 不扩展。只禁精确保留 env key；ASCII大小写冲突/保留名变体提示而不定罪。非ASCII env key的大小写等价也不能由ASCII转换证明，按D5给advisory并由strict拦截，不声称复制了Windows环境名比较算法。env值保持opaque。
 
 URL 用 url crate 配合原串检查，防宽松修复掩盖空 fragment/userinfo/反斜杠/非绝对形式。无 DNS。HTTP 明确 localhost、标准 127/8、::1 合法；IPv4 缩写、mapped IPv6 等欠定为 unchecked，不假装都安全或都违规。headers 用 http::HeaderName/HeaderValue，跨大小写重复为 entry 错；值不做替换，不因单独 Authorization 键就断言秘密。秘密候选只能非规范 advisory，真实性 manual。
 
@@ -131,8 +135,8 @@ extensions 非对象 ignored；unknown namespace value 整体不检查（§8.1�
 
 真实靶子 HEAD 见 research/PROVENANCE.md。期望 11 plugin、24 skill 候选、0 MCP；两 references 逃逸 ignored/deny-path，guided-review 逃逸 component/skip-skill，共三条确定路径逃逸。若新 HEAD 语料变化先如实记录，不修改它来迎合预期。最终报告区分源码树、安装产物、MCP 静态配置与真实连接；未启动服务不能称连接验过。
 
-## 9. 待飞鸢裁决与非目标
+## 9. 已定策略与非目标
 
-D2′ 结构化接口由本设计落地，发布稳定性仍需 review。D3 unknown extension value 的作者侧合规裁决；D4 默认 ignored MUST 退出 1；D5 token/loopback/env 大小写接受域；D6 无版本 AS 快照及 Unicode/NFKC 裁决；D7 宿主矩阵与二进制/crates/skill 发行范围；D8 支持平台承诺。当前保守实现不将这些待决解释伪称已拍板。
+D2′ 结构化接口已落地。D3–D8 已按 DECISIONS.md 追加定案：未知 namespace value 不检、不据此判作者违规；默认 ignored MUST 退出1；token/loopback/env大小写欠定形态保持unchecked或advisory并由strict拦截；AS日期快照与Unicode保守策略不变；L6不进v1，发行目标是clone后cargo build；三平台须各自在CI实测，Windows全绿前不宣称支持。平台已验范围与具体降级见最新REVIEW记录，不用Linux结果替代其他平台。
 
 本轮范围包含可运行引擎与 public 源码仓库，不含 crates.io 发布、宿主矩阵、SARIF、--fix、旧库归档、改 eric-way 或安装测试。Linux 实测范围以 REVIEW.md 为准。
