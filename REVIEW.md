@@ -121,3 +121,40 @@ cargo package -p agent-skills-lint --list --offline --allow-dirty
 未验：Windows/macOS/junction平台行为，原子文件系统快照或完整竞态安全证明，宿主加载/安装器产物，MCP启动/连接/认证/握手，PLUGIN_DATA生命周期，秘密真实性、域名控制权、完整客户端合规、固定tokenizer预算、crates.io发行及安装。没有配置远程CI，不声称GitHub Actions通过。运行期未知项、Unicode/NFKC及RULE_NOT_EVALUATED继续以未检查/人工/运行时状态公开。
 
 待飞鸢裁决仍为D3未知扩展作者侧语义、D4默认ignored MUST及strict选择政策、D5欠定语法接受域、D6 AS快照/Unicode裁决、D7宿主与发行范围、D8平台承诺。新库接口形状已按本轮Rust设计落地；旧库归档仍是另行授权的后续动作。
+
+
+## D3–D8 平台续轮（2026-09-21，进行中）
+
+本节覆盖前一轮的“未配置远程CI / D3–D8待拍板”历史状态；DECISIONS.md 的追加定案有效，PR #1 保持未合并。astra 使用 Paseo 调度 codex/gpt-5.6-terra（full-access）实现，自己负责设计、源码review与独立执行验证。
+
+astra 亲自执行 `gh run view 35594975412 --log-failed` 核对原始失败。macOS 首个错误是 InputChanged 精确断言；另三个测试是该 panic 导致测试串行锁 poisoning 的连带失败，不能据此声称三个 FIFO/link 分支各自有安全失败。Windows 同一 InputChanged 断言失败。根因是 read_safe 只 canonicalize 文件、没有 canonicalize 传入的根：macOS `/var` 别名与 Windows extended-length 前缀使包含比较提前返回 Unsafe，尚未进入竞态 hook。
+
+52f67ee 固定每次操作入口的 canonical 根，整个读取期间不重新绑定边界；增加普通文件、Unix根别名/根切换测试。原 InputChanged、Unsafe 精确断言及 O_NONBLOCK 保留。HookGuard 清理测试 hook，poison 恢复只避免前次测试污染，不吞掉原 panic。astra 本机独立运行 `cargo fmt --all -- --check`、`cargo test --workspace --locked`、`cargo clippy --workspace --all-targets --locked -- -D warnings`、`git diff --check` 均过。
+
+[原生CI 35596049438](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35596049438) 验证 containment 所在 lib：macOS 13/13、Windows 8/8 全过，Ubuntu全套通过；不能据此宣称三平台全绿。继续执行后暴露 macOS 的 cwd fixture 用 raw 根构造路径，未跟随 canonical ROOT；Windows 的 vendor schema 哈希错误，实际哈希与 LF 转 CRLF 的独立计算完全吻合。保留哈希和路径语义断言，修正 fixture/checkout 字节保真，不接受改变预期哈希。
+
+D3/D4 初审：astra 独立实际 CLI 输入涵盖未知 namespace 的 number/array、明确非法 namespace、非object extensions、未知顶层字段、非SemVer版本、env大小写。结果符合 §8.1 的未知值不检、D4 ignored MUST 默认1/advisory默认0。发现 D5 缺口：反斜杠/驱动器形态 command 被判 COMMAND_BARE，strict也0，待边界fixture修正。D7代码未加入--fix/SARIF/host或发布流程，双crate仍可clone后cargo build；不执行crates.io发布。
+
+3800a61 的 [CI 35596534564](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35596534564)：Ubuntu、Windows全套clippy/test通过，fmt通过；Windows schema原字节哈希与 `./${PLUGIN_ROOT}` 展开路径的明确IO/unchecked断言均通过。macOS schema与MCP通过，s2b后续fixture创建时拒绝非法UTF-8文件名（EILSEQ 92），不是引擎误报。Unix正例改用canonical ROOT构造后仍精确要求containment Pass；Windows无效OS路径测试精确要求exit2/MCP_PATH_IO/Unchecked且无escape违规。非递归展开正例拆分后在所有平台保留并增加Pass证据断言。
+
+macOS runner不允许创建非法UTF-8目录项，真实collection遇到该目录项的扫描场景在该runner未验；不将文件系统拒绝创建当成扫描通过。输入参数本身的非法UTF-8则无需创建目录，可直接验证PATH_ENCODING/exit2。Linux仍保留真实非法目录项扫描。
+
+cbb121d 的 [CI 35596940005](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35596940005)：Ubuntu/Windows及fmt通过；macOS的plugin crate全部通过，skills库另一个同类非法UTF-8目录fixture在创建阶段返回EILSEQ。下一片将目录名编码检查前置于读取，并将断言强化为精确NonUtf8Directory；不依赖创建macOS文件系统禁止的名字。
+
+身份增强片的中途review曾退回一个未提交实现：BeforeOpen hook被移到正文读取句柄打开之后，虽保留原InputChanged断言文字，却削弱FIFO替换攻击时序。astra要求持有独立身份guard，实际正文句柄仍在BeforeOpen之后打开，再比较身份；FIFO测试额外证明到达AfterOpen。初始guard打开已通过包含检查的canonical目标，避免再次跟随可被重定向的逻辑链接。Windows原生API失败须立即取last error，能力不支持与普通IO分开。此退回不作为验收结果。
+
+498964f 的 [CI 35599455538](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35599455538) 首次三平台全绿，fmt亦通过。astra此前亲自执行workspace test/clippy/fmt/diffcheck通过。Windows原生日志明确运行并通过 `windows_file_id_distinguishes_same_length_same_mtime_files`（直接比较volume+128bitID）、`detects_same_length_changes_with_restored_mtime`（BeforeOpen/AfterRead替换）、原先不同长度替换/改写、两项Unsupported报告测试。macOS整个workspace通过，非UTF8入口错误、ELOOP与FIFO分支已原生执行。此时仍有review未收口：原地同长度恢复mtime用例、Unsupported后继blocked及FIFO有界watchdog。不能把这次全绿当作这些缺口已验。已更换新的Terra会话限定收口。
+
+本片曾尝试本机GNU Windows cross-check，但未安装该target，E0463；不算Windows证据。上述Windows证据来自原生MSVC runner。
+
+d746b84 收口片经astra独立workspace test/clippy/fmt/diffcheck通过后推原生CI。补齐BeforeOpen替换、AfterRead替换、AfterRead原地改写三例，增加FIFO 2秒watchdog及Unsupported完整JSON/独立组件证据。重构时曾丢失旧MCP JSON_REPRESENTATION入口记录，astra指出后已恢复并强化回归。
+
+[CI 35600630893](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35600630893)：Ubuntu、macOS、fmt通过；Windows新增的AfterRead原地同长度改写/恢复mtime断言失败（14过1失败），其他新回归及Unsupported传播通过。原日志只有matches失败，没有实际Result，因此先补诊断原生复跑，不凭Linux成功猜Windows结果，更不能删该用例或延时避开它。
+
+astra在隔离源码副本中只将O_NONBLOCK改为0，FIFO substitution单测在2.00秒由watchdog失败（cargo exit101，预期负向结果），进程正常结束。该次使用共享target导致随后的正常树单测误复用了mutant产物；源码未变。已删除副本并clean两个本地crate的构建缓存，重新执行完整测试/clippy；以重建后的结果为准。此负向注入仅Linux做过。
+
+诊断提交d8950af的[原生CI 35601200199](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35601200199)再次仅Windows失败，精确输出`Ok("one")`；改写前后volume/FileId/ChangeTime/len/mtime全部相同。现有元数据门禁确实漏检正文变化，非错误类别误判。astra据此设计已打开句柄的二次内容确认，并要求去除额外诊断查询后保持原攻击时序复验。
+
+内容确认片已去掉额外Windows诊断查询，三条同长度/恢复mtime的精确InputChanged断言均保留。astra再次亲自执行 `cargo fmt --all -- --check`、`cargo test --workspace --locked`、`cargo clippy --workspace --all-targets --locked -- -D warnings`、`git diff --check` 均过，原生CI结果另记。
+
+追加README任务由astra撰写，71cda37直接推main，仅双语README变更。安装命令在614f45d源码的隔离worktree执行 `cargo install --path crates/agent-plugin-lint --locked --offline --root <临时目录>` 成功；安装二进制扫描frontend真实语料，README输出节选逐字匹配、退出1。README保留当时main的Linux已验/其余未验状态，安全读取改动仍仅在未合并PR分支。main已合入ci/platform-matrix。

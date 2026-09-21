@@ -1,5 +1,5 @@
 use std::fs::{self, File, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::path::{Path, PathBuf};
 
 #[derive(Debug)]
@@ -207,10 +207,33 @@ pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
     let mut source = String::new();
     file.read_to_string(&mut source)?;
     test_hook(HookPoint::AfterRead);
+    verify_snapshot(&root, path, &before_path, &guard, &file, &before)?;
+
+    // Metadata and file identity alone cannot prove an in-place, same-length
+    // rewrite was not missed by filesystem timestamp granularity. Re-read the
+    // already verified body handle; do not open a second body path.
+    file.seek(SeekFrom::Start(0))?;
+    let mut confirmation = Vec::new();
+    file.read_to_end(&mut confirmation)?;
+    if confirmation != source.as_bytes() {
+        return Err(ReadError::InputChanged);
+    }
+    verify_snapshot(&root, path, &before_path, &guard, &file, &before)?;
+    Ok(source)
+}
+
+fn verify_snapshot(
+    root: &Path,
+    path: &Path,
+    before_path: &Path,
+    guard: &File,
+    file: &File,
+    before: &Identity,
+) -> Result<(), ReadError> {
     let read_after = file.metadata()?;
     let guard_after = guard.metadata()?;
     let after_path = fs::canonicalize(path).map_err(|_| ReadError::InputChanged)?;
-    if after_path != before_path || !after_path.starts_with(&root) {
+    if after_path != before_path || !after_path.starts_with(root) {
         return Err(ReadError::InputChanged);
     }
     let after_metadata = fs::metadata(&after_path).map_err(|_| ReadError::InputChanged)?;
@@ -220,15 +243,15 @@ pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
     let path_file = open_read(path).map_err(|_| ReadError::InputChanged)?;
     let path_handle = path_file.metadata().map_err(|_| ReadError::InputChanged)?;
     if !read_after.is_file()
-        || identity(&file, &read_after)? != before
+        || identity(file, &read_after)? != *before
         || !guard_after.is_file()
-        || identity(&guard, &guard_after)? != before
+        || identity(guard, &guard_after)? != *before
         || !path_handle.is_file()
-        || identity(&path_file, &path_handle)? != before
+        || identity(&path_file, &path_handle)? != *before
     {
         return Err(ReadError::InputChanged);
     }
-    Ok(source)
+    Ok(())
 }
 fn open_read(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
@@ -443,11 +466,6 @@ mod tests {
         let file = temp.path().join("file");
         fs::write(&file, "one").unwrap();
         let original = fs::metadata(&file).unwrap();
-        #[cfg(windows)]
-        let before_identity = {
-            let handle = File::open(&file).unwrap();
-            identity(&handle, &original).unwrap()
-        };
         let copy = file.clone();
         let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::AfterRead) {
@@ -458,20 +476,6 @@ mod tests {
                 let current = fs::metadata(&copy).unwrap();
                 assert_eq!(current.len(), original.len());
                 assert_eq!(current.modified().unwrap(), original.modified().unwrap());
-                #[cfg(windows)]
-                {
-                    let handle = File::open(&copy).unwrap();
-                    let restored_identity = identity(&handle, &current).unwrap();
-                    eprintln!(
-                        "in-place safe-read diagnostic: before_identity={before_identity:?}; \
-                         restored_identity={restored_identity:?}; before_len={}; restored_len={}; \
-                         before_modified={:?}; restored_modified={:?}",
-                        original.len(),
-                        current.len(),
-                        original.modified().ok(),
-                        current.modified().ok(),
-                    );
-                }
             }
         });
         let result = read_safe(temp.path(), &file);
