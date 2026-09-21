@@ -25,6 +25,12 @@ fn options(mode: InputMode) -> LintOptions {
     }
 }
 
+#[cfg(unix)]
+fn non_utf8_component() -> std::ffi::OsString {
+    use std::os::unix::ffi::OsStringExt;
+    std::ffi::OsString::from_vec(b"bad\xFF".to_vec())
+}
+
 #[test]
 fn explicit_plugin_without_manifest_is_a_content_failure() {
     let temp = TempDir::new().unwrap();
@@ -237,12 +243,8 @@ fn roots_are_relative_to_the_input() {
 #[cfg(unix)]
 #[test]
 fn non_utf8_paths_are_operational_errors() {
-    use std::os::unix::ffi::OsStringExt;
     let temp = TempDir::new().unwrap();
-    let path = temp
-        .path()
-        .join(std::ffi::OsString::from_vec(b"bad\xFF".to_vec()));
-    fs::create_dir(&path).unwrap();
+    let path = temp.path().join(non_utf8_component());
     let report = lint_path(&path, options(InputMode::Plugin));
     assert_eq!(report.exit_code, 2);
     assert!(
@@ -254,17 +256,14 @@ fn non_utf8_paths_are_operational_errors() {
     assert_eq!(report.input, "<non-utf8-path>");
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn non_utf8_collection_child_is_not_silently_skipped() {
-    use std::os::unix::ffi::OsStringExt;
     let temp = TempDir::new().unwrap();
     let valid = temp.path().join("valid");
     fs::create_dir(&valid).unwrap();
     write_manifest(&valid, json!({}));
-    let invalid = temp
-        .path()
-        .join(std::ffi::OsString::from_vec(b"bad\xFF".to_vec()));
+    let invalid = temp.path().join(non_utf8_component());
     fs::create_dir(&invalid).unwrap();
     let report = lint_path(temp.path(), options(InputMode::Collection));
     assert_eq!(report.exit_code, 2);
@@ -274,6 +273,15 @@ fn non_utf8_collection_child_is_not_silently_skipped() {
             .iter()
             .any(|error| error.code == "PATH_ENCODING")
     );
+}
+
+#[cfg(target_os = "macos")]
+#[test]
+fn apfs_rejects_non_utf8_collection_child_creation() {
+    let temp = TempDir::new().unwrap();
+    let invalid = temp.path().join(non_utf8_component());
+    let error = fs::create_dir(&invalid).expect_err("APFS rejects invalid UTF-8 bytes");
+    assert_eq!(error.raw_os_error(), Some(libc::EILSEQ));
 }
 
 #[cfg(unix)]
