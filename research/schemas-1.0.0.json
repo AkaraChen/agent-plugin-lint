@@ -1,0 +1,34 @@
+[
+  {
+    "name": "mcp.schema.json",
+    "path": "schemas/1.0.0/mcp.schema.json",
+    "sha": "a9139a4259b932c60b5351c8d9da6a5c60c97646",
+    "size": 3408,
+    "url": "https://api.github.com/repos/agentplugins/agent-plugins-spec/contents/schemas/1.0.0/mcp.schema.json?ref=main",
+    "html_url": "https://github.com/agentplugins/agent-plugins-spec/blob/main/schemas/1.0.0/mcp.schema.json",
+    "git_url": "https://api.github.com/repos/agentplugins/agent-plugins-spec/git/blobs/a9139a4259b932c60b5351c8d9da6a5c60c97646",
+    "download_url": "https://raw.githubusercontent.com/agentplugins/agent-plugins-spec/main/schemas/1.0.0/mcp.schema.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/agentplugins/agent-plugins-spec/contents/schemas/1.0.0/mcp.schema.json?ref=main",
+      "git": "https://api.github.com/repos/agentplugins/agent-plugins-spec/git/blobs/a9139a4259b932c60b5351c8d9da6a5c60c97646",
+      "html": "https://github.com/agentplugins/agent-plugins-spec/blob/main/schemas/1.0.0/mcp.schema.json"
+    }
+  },
+  {
+    "name": "plugin.schema.json",
+    "path": "schemas/1.0.0/plugin.schema.json",
+    "sha": "8fed0e1fe45d0464aee880d3fbab228b71ecfc1e",
+    "size": 1805,
+    "url": "https://api.github.com/repos/agentplugins/agent-plugins-spec/contents/schemas/1.0.0/plugin.schema.json?ref=main",
+    "html_url": "https://github.com/agentplugins/agent-plugins-spec/blob/main/schemas/1.0.0/plugin.schema.json",
+    "git_url": "https://api.github.com/repos/agentplugins/agent-plugins-spec/git/blobs/8fed0e1fe45d0464aee880d3fbab228b71ecfc1e",
+    "download_url": "https://raw.githubusercontent.com/agentplugins/agent-plugins-spec/main/schemas/1.0.0/plugin.schema.json",
+    "type": "file",
+    "_links": {
+      "self": "https://api.github.com/repos/agentplugins/agent-plugins-spec/contents/schemas/1.0.0/plugin.schema.json?ref=main",
+      "git": "https://api.github.com/repos/agentplugins/agent-plugins-spec/git/blobs/8fed0e1fe45d0464aee880d3fbab228b71ecfc1e",
+      "html": "https://github.com/agentplugins/agent-plugins-spec/blob/main/schemas/1.0.0/plugin.schema.json"
+    }
+  }
+]

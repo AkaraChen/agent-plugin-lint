@@ -1,0 +1,14 @@
+[package]
+name = "agent-plugin-lint"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+description = "离线、只读的 Agent Plugins 校验库"
+
+[[bin]]
+name = "ap-lint"
+path = "src/main.rs"
+
+[dependencies]
+agent-skills-lint = { path = "../agent-skills-lint", version = "0.1.0" }
