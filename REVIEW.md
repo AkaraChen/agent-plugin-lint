@@ -50,3 +50,17 @@ astra 实际执行 46 个测试、clippy、fmt、build，以及 13 个 CLI 用�
 S2b 第二轮：astra 实际执行 50 个测试、clippy、fmt、build、13 个 CLI + 15 个强化文件系统 + 6 个复现断言全过。发现 IO 分支 coverage 仍误记 location=fail，要求最后修正；没有把无 finding 等同于覆盖状态准确。
 
 S2b 第三轮接受：astra 独立执行 51 个测试、clippy、fmt、build 与强化后的 6 个复现断言，全过；IO coverage 不再伪称规范失败。CLI 的0/1/2、参数/JSON错误、相对root、目录别名、内外manifest链接、FIFO、权限与非UTF8错误已验。读取时文件变化二次核验及组件读取属于S3，尚未验；大小写不敏感文件系统未实机验证，仅检查精确枚举实现。
+
+## S3 首轮：真实靶子命中，仍退回
+
+astra 运行 `AP_LINT_CORPUS=/home/akrc/Developer/eric-way/plugins cargo test --workspace`（54 个测试，语料变量显式提供）、clippy、fmt、build、21 个文件系统及 6 个 S2b 复现通过。独立 CLI 扫描确实产生预期三条外链，11 包，退出1；两个资源 ignored/deny-path，整个 guided-review component/skip-skill（§4.1、§7.1）。
+
+但额外探针暴露：skills 权限错误返回0或误报kind；外链中的SKILL.md是目录仍被当skill；500行建议被适配层吞掉；合法skill只剩总括pass、库coverage丢失；资源断链完全无记录。源码还缺原定读取身份二次核验，read_dir/编码错误被吞。已退回，真实靶子成功没有取代正确性审查。
+
+S3 后续复验：cargo 显示54个 workspace 测试通过，其中语料测试未给环境变量而空返回；这项不计真实语料验证，只有53项实际执行测试。clippy、fmt、21 filesystem + 6 S2b + 12 S3 probes 通过，但尚未接受。源码仍无 File handle 身份核验，manifest 未接共同 reader，resolve 丢 IO 原因。新增三个权限探针（SKILL.md 不可读、mcp 链接穿过无权限目录、资源链接穿过无权限目录）实际退出分别0/1/0，应全为2。已换新 terra 会话，将读取/IO/精确发现拆成明确修正片，继续验证，不以实现总结作为通过证据。
+
+S3 读取/IO 修正片：astra 独立执行57个常规测试（另1语料测试明确ignored）、clippy、fmt、build；21+6+12黑盒通过；再显式 `AP_LINT_CORPUS=... cargo test -p agent-plugin-lint --test s3 corpus -- --ignored` 1/1通过。已核实typed IO、File metadata dev/ino/mtime比较、manifest/skill共同reader、递归前根界检查。仍退回精确文件名发现遗漏、外部helper缺SKILL的ENOENT分类、FIFO替换测试，以及AS建议项/元数据汇总收口。
+
+JSON收口待修：独立CLI证明未知字段1e400被解析器范围限制误报manifest JSON fatal。独立依赖实验启用arbitrary_precision后，大数通过但真实`$serde_json::private::Number`对象键被改成Number（1/2实验失败），因此不采用仅开feature的修法。S5将采用语法/表示能力分离，能力不足明确未检查；临时实验文件已移除，不计常规测试通过。
+
+S3 接受：astra 最后独立执行62个常规测试、clippy、fmt、build，18个强化skill黑盒全过；显式ignored语料1/1通过。此前21文件系统+6 CLI错误复现及29个已实现规则元数据对照也已通过。确切枚举、句柄身份变化检测、普通文件换FIFO、IO隔离、完整AS适配、建议不提升为MUST、混合可读/不可读skill汇总均已核实。真实语料仍11包、23个AS实际读取target、1个外部skill未读取；精确三条路径/radius/effect通过（§4.1、§6.2、§7.1）。读取不是原子快照；其他平台未测试。JSON数值能力边界仍作为S5已知待修，不声称整个引擎已最终验收。

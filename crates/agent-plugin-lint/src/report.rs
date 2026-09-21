@@ -123,6 +123,10 @@ pub struct Finding {
     pub confidence: Confidence,
     pub path: String,
     pub pointer: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub column: Option<usize>,
     pub scope: Scope,
     pub effect: Effect,
     #[serde(rename = "evidenceCode")]

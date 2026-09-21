@@ -18,6 +18,17 @@ pub enum RuleId {
     ExtensionsObject,
     ExtensionUnknown,
     PathManifestEscape,
+    PathFixedEscape,
+    PathSkillEscape,
+    PathResourceEscape,
+    DiscoveryKind,
+    AdviceUnresolvedPath,
+    AdviceSkillsUnchecked,
+    AsFrontmatter,
+    AsName,
+    AsDescription,
+    AsOptionalFields,
+    AsSizeGuidance,
     SkillConformance,
     McpEnvelope,
     AdviceDuplicateJsonKey,
@@ -52,15 +63,26 @@ impl RuleId {
             Self::ExtensionsObject => "AP-EXTENSIONS-OBJECT",
             Self::ExtensionUnknown => "AP-EXTENSION-UNKNOWN",
             Self::PathManifestEscape => "AP-PATH-MANIFEST-ESCAPE",
+            Self::PathFixedEscape => "AP-PATH-FIXED-ESCAPE",
+            Self::PathSkillEscape => "AP-PATH-SKILL-ESCAPE",
+            Self::PathResourceEscape => "AP-PATH-RESOURCE-ESCAPE",
+            Self::DiscoveryKind => "AP-DISCOVERY-KIND",
+            Self::AdviceUnresolvedPath => "AP-ADVICE-UNRESOLVED-PATH",
+            Self::AdviceSkillsUnchecked => "AP-ADVICE-SKILLS-UNCHECKED",
+            Self::AsFrontmatter => "AS-FRONTMATTER",
+            Self::AsName => "AS-NAME",
+            Self::AsDescription => "AS-DESCRIPTION",
+            Self::AsOptionalFields => "AS-OPTIONAL-FIELDS",
+            Self::AsSizeGuidance => "AS-SIZE-GUIDANCE",
             Self::SkillConformance => "AP-SKILL-CONFORMANCE",
             Self::McpEnvelope => "AP-MCP-ENVELOPE",
             Self::AdviceDuplicateJsonKey => "AP-ADVICE-DUPLICATE-JSON-KEY",
         }
     }
     pub fn metadata(self) -> RuleMetadata {
-        use Effect::{Advise, IgnoreField, RejectPlugin};
+        use Effect::{Advise, DenyPath, DisableType, IgnoreField, RejectPlugin, SkipSkill};
         use Obligation::{Must, Should};
-        use Radius::{Advisory, Fatal, Ignored};
+        use Radius::{Advisory, Component, Fatal, Ignored};
         let package = Subject::Package;
         let certain = Confidence::Certain;
         match self {
@@ -174,14 +196,79 @@ impl RuleId {
                 confidence: certain,
                 effect: RejectPlugin,
             },
-            Self::SkillConformance | Self::McpEnvelope => RuleMetadata {
-                spec: &["§6.2", "§7.1"],
-                radius: Fatal,
+            Self::PathFixedEscape | Self::DiscoveryKind => RuleMetadata {
+                spec: &["§4.1", "§6.2"],
+                radius: Component,
                 normative: true,
                 obligation: Must,
                 subject: package,
                 confidence: certain,
-                effect: RejectPlugin,
+                effect: DisableType,
+            },
+            Self::PathSkillEscape => RuleMetadata {
+                spec: &["§4.1", "§7.1"],
+                radius: Component,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: SkipSkill,
+            },
+            Self::PathResourceEscape => RuleMetadata {
+                spec: &["§4.1"],
+                radius: Ignored,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: DenyPath,
+            },
+            Self::AsFrontmatter | Self::AsName | Self::AsDescription | Self::AsOptionalFields => {
+                RuleMetadata {
+                    spec: &["§7.1"],
+                    radius: Component,
+                    normative: true,
+                    obligation: Must,
+                    subject: package,
+                    confidence: certain,
+                    effect: SkipSkill,
+                }
+            }
+            Self::AsSizeGuidance => RuleMetadata {
+                spec: &["§7.1"],
+                radius: Advisory,
+                normative: true,
+                obligation: Obligation::Recommended,
+                subject: package,
+                confidence: certain,
+                effect: Advise,
+            },
+            Self::AdviceUnresolvedPath | Self::AdviceSkillsUnchecked => RuleMetadata {
+                spec: &["§4.1", "§7.1"],
+                radius: Advisory,
+                normative: false,
+                obligation: Obligation::None,
+                subject: package,
+                confidence: certain,
+                effect: Advise,
+            },
+            Self::SkillConformance => RuleMetadata {
+                spec: &["§7.1"],
+                radius: Component,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: SkipSkill,
+            },
+            Self::McpEnvelope => RuleMetadata {
+                spec: &["§7.2.1", "§7.2.2"],
+                radius: Component,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: DisableType,
             },
             Self::AdviceDuplicateJsonKey => RuleMetadata {
                 spec: &[],
@@ -198,5 +285,21 @@ impl RuleId {
 impl Serialize for RuleId {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         serializer.serialize_str(self.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn component_rule_metadata_has_narrow_boundaries() {
+        let skill = RuleId::SkillConformance.metadata();
+        assert_eq!(skill.spec, ["§7.1"]);
+        assert_eq!(skill.radius, Radius::Component);
+        assert_eq!(skill.effect, Effect::SkipSkill);
+        let mcp = RuleId::McpEnvelope.metadata();
+        assert_eq!(mcp.spec, ["§7.2.1", "§7.2.2"]);
+        assert_eq!(mcp.radius, Radius::Component);
+        assert_eq!(mcp.effect, Effect::DisableType);
     }
 }

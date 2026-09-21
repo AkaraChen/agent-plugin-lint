@@ -7,10 +7,12 @@ name = "agent-plugin-lint"
 version = "0.1.0"
 dependencies = [
  "agent-skills-lint",
+ "libc",
  "semver",
  "serde",
  "serde_json",
  "sha2",
+ "tempfile",
 ]
 
 [[package]]

@@ -15,6 +15,7 @@ agent-skills-lint = { path = "../agent-skills-lint", version = "0.1.0" }
 serde.workspace = true
 serde_json.workspace = true
 semver = "1"
+libc = "0.2"
 
 [dev-dependencies]
 sha2 = "0.10"

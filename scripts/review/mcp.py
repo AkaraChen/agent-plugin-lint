@@ -1,0 +1,41 @@
+"""astra independent MCP edge fixtures, offline and read-only at runtime."""
+import pathlib as P,tempfile,subprocess,json
+B=P.Path('target/debug/ap-lint').resolve();S='https://agent-plugins.org/schemas/1.0.0/';passed=[]
+def case(label,servers,code,check=lambda r:True,envelope=None,setup=None):
+ with tempfile.TemporaryDirectory() as d:
+  p=P.Path(d);(p/'plugin.json').write_text(json.dumps({'$schema':S+'plugin.schema.json','name':'a'}));m={'$schema':S+'mcp.schema.json','mcpServers':servers};m.update(envelope or {});(p/'mcp.json').write_text(json.dumps(m))
+  if setup:setup(p)
+  q=subprocess.run([str(B),str(p),'--json'],capture_output=True,text=True,timeout=8);r=json.loads(q.stdout);assert q.returncode==code,(label,q.returncode,r);assert check(r),(label,r);passed.append(label)
+def fs(r):return r['plugins'][0]['findings']
+def has(rule,effect=None):return lambda r:any(f['ruleId']==rule and (effect is None or f['effect']==effect) for f in fs(r))
+def remote(url,**kw):return {'h':{'type':'sse','url':url,**kw}}
+def std(**kw):return {'s':{'type':'stdio','command':'node',**kw}}
+case('empty server map',{},0)
+case('empty and proto keys',{'':{'type':'stdio','command':'node'},'__proto__':{'type':'stdio','command':'node'}},0)
+case('bad entry isolated',{'bad':3,'good':{'type':'stdio','command':'node'}},1,lambda r:any(f['effect']=='skip-server' and f['scope']['id']=='bad' for f in fs(r)) and not any(f['effect'] in ['disable-type','reject-plugin'] for f in fs(r)))
+case('envelope closed',{},1,has('AP-MCP-ENVELOPE','disable-type'),{'unknown':True})
+case('version mismatch',{},1,has('AP-MCP-VERSION-MATCH','disable-type'),{'$schema':'https://agent-plugins.org/schemas/1.1.0/mcp.schema.json'})
+case('abs command',std(command='/usr/bin/node'),1)
+case('parent command',std(command='../node'),1)
+case('ambiguous bare',std(command='node --version'),0,lambda r:any(f['radius']=='advisory' for f in fs(r)))
+case('path with space',std(command='./my executable'),0,setup=lambda p:(p/'my executable').write_text('opaque'))
+case('cwd invalid bare',std(cwd='data'),1,has('AP-MCP-CWD-FORM','skip-server'))
+case('cwd data future',std(cwd='${PLUGIN_DATA}/../future'),0,lambda r:any(c['status']=='runtime' for c in r['plugins'][0]['coverage']))
+case('cwd root',std(cwd='${PLUGIN_ROOT}'),0)
+case('cwd outside',std(cwd='./..'),1,has('AP-PATH-SERVER-ESCAPE','skip-server'))
+case('opaque args env',std(args=['../x','/tmp','${HOME}'],env={'X':'../../x','PATH':'../x'}),0)
+case('env case advisory',std(env={'plugin_root':'x'}),0,lambda r:not any(f['radius']=='component' for f in fs(r)))
+case('reserved data',std(env={'PLUGIN_DATA':'x'}),1,has('AP-MCP-RESERVED-ENV'))
+case('exact localhost',remote('http://localhost:123/a'),0)
+case('suffix localhost',remote('http://localhost.example'),1,has('AP-MCP-HTTPS'))
+case('trailing dot localhost',remote('http://localhost.'),1,has('AP-MCP-HTTPS'))
+case('ipv6 localhost',remote('http://[::1]:123'),0)
+case('ipv4 shortened ambiguous',remote('http://127.1'),0,lambda r:any(c['status']=='unchecked' for c in r['plugins'][0]['coverage']))
+case('empty userinfo',remote('https://@example.com'),1,has('AP-MCP-URL'))
+case('empty fragment',remote('https://example.com#'),1,has('AP-MCP-URL'))
+case('headers duplicate case',remote('https://example.com',headers={'X-A':'one','x-a':'two'}),1,has('AP-MCP-HEADERS'))
+case('headers CRLF',remote('https://example.com',headers={'X-A':'one\r\ntwo'}),1,has('AP-MCP-HEADERS'))
+case('headers literal',remote('https://example.com',headers={'X-A':'${PLUGIN_ROOT}'}),0)
+secret='SENTINEL_do_not_echo_912841'
+case('secret heuristic no conviction',std(env={'API_TOKEN':secret}),0,lambda r:secret not in json.dumps(r) and all(f['radius']=='advisory' for f in fs(r)))
+print(json.dumps({'passed':len(passed),'cases':passed},ensure_ascii=False,indent=2))

@@ -123,6 +123,8 @@ impl State {
             confidence: metadata.confidence,
             path: "plugin.json".into(),
             pointer: (!segments.is_empty()).then(|| pointer(segments)),
+            line: None,
+            column: None,
             scope: Scope::Plugin,
             effect: metadata.effect,
             evidence_code: code.into(),

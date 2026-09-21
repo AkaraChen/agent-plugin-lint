@@ -85,7 +85,7 @@ D4 尚待飞鸢正式裁决，本轮可审阅默认：确定的包侧 normative 
 
 ## 5. manifest 与目录发现
 
-manifest 先安全读取，再严格 JSON 和顶层对象。未知顶层键逐个 ignored；非对象 extensions ignored；其他确定违规 fatal 后不读组件（§5.2、§11.3）。metadata 只检查正文类型，不因 URL/email/SPDX/版本格式拒包（§5.4）；SemVer 可给 advisory。内层 author 是闭合集合。plugin name 和 skill name 是两种规则，plugin 可以有点。
+manifest 先安全读取，再严格 JSON 和顶层对象。JSON 语法与解析器能力分开：以 RawValue 验证完整语法；若语法合法但 Value 无法表示数值范围，记录工具能力错误及 unchecked/blocked，不能当作 JSON 违规。不得仅开启 arbitrary_precision 而把真实 `$serde_json::private::Number` 对象键误认内部数值标记。未知顶层键逐个 ignored；非对象 extensions ignored；其他确定违规 fatal 后不读组件（§5.2、§11.3）。metadata 只检查正文类型，不因 URL/email/SPDX/版本格式拒包（§5.4）；SemVer 可给 advisory。内层 author 是闭合集合。plugin name 和 skill name 是两种规则，plugin 可以有点。
 
 `ap-lint <path> [--mode auto|plugin|collection] [--spec 1.0.0] [--json|--format text|json] [--strict]`。无 --fix、--host、SARIF、外部 skills-report。未知参数返回 2。--spec 不覆写 manifest 声明。self-test 可后置，开发用 cargo test 做真实验证，不宣称空自检有效。
 
