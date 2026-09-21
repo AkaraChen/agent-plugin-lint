@@ -53,3 +53,34 @@ fixture：`/tmp/fx/{ascii-ok,cjk-desc,metadata-field}`（ascii-ok 通过，另�
 - crates.io 空闲：`ap-lint` / `agent-plugin-lint` / `plugin-lint` / `ap-linter`；占用：`apx` / `agent-plugins`
 - 本机 `gh` 已登录 AkaraChen（scopes 含 `repo`）→ 建库/归档都能做
 - 本机 rust：cargo 1.98.0 / rustc 1.98.0
+
+---
+
+## D3–D8 定案（2026-09-21，飞鸢授权「都按你推荐的来」）
+
+| # | 定案 | 落地 |
+|---|---|---|
+| **D3** 未实现的 extension 值 | **保守**：不校验未实现 namespace 的 value；只判「明确非法的 namespace 形态」；**禁止**把未实现当作作者侧违规 fatal | 现状即定案，无代码变更 |
+| **D4** 默认政策 | **采用**：确定的包侧 normative MUST → 退出 1（**含 ignored**）；只有 advisory → 0；`--strict` 再拦 advisory 与选定静态规则的 unchecked。要「加载可用性」视角的消费者从 JSON 的 `radius` 自行过滤，不混进默认 policy | 现状即定案 |
+| **D5** 欠定语法边缘 | **保守**：`command` token 字符语法 / loopback 接受域 / env 大小写差异（Windows 不敏感）一律标 unchecked 或 advisory，由 `--strict` 拦截；边界例子固化进 fixture；正文澄清后再升级 ruleset | 现状即定案 |
+| **D6** AS 快照与 Unicode | **保守**：不做静默 NFKC；非 ASCII 仅规范化差异不擅自拒绝；未知 frontmatter 字段不按白名单定罪；须记录所依据的 AS 文本 | ✅ **已满足**：`research/agent-skills-specification.md` + `research/PROVENANCE.md`（SHA-256 + 获取日期，并标明「无版本号」） |
+| **D7** 宿主矩阵与发行范围 | **L6 不进 v1**；本轮不含 crates.io 发布、SARIF、`--fix`、旧库归档。发行目标 = 「clone 下来 `cargo build` 就能用」 | 现状即定案 |
+| **D8** 平台承诺 | **Windows 提上日程**（飞鸢 2026-09-21）：改用 GitHub Actions 的 windows runner 实测，不再只写「未验证」 | 见下 |
+
+### D8 的推进方式
+
+`.github/workflows/ci.yml`：三平台矩阵 `ubuntu-latest` / `macos-latest` / `windows-latest`，
+各自 `cargo clippy --workspace --all-targets --locked -- -D warnings` + `cargo test --workspace --locked`；
+另有独立的 `fmt` job（ubuntu，避免三平台重复）。
+
+外部 action 版本于 2026-09-21 实时核对上游 release：`actions/checkout@v7.0.1`、
+`actions-rust-lang/setup-rust-toolchain@v2.0.0`、`Swatinem/rust-cache@v2.9.2`。
+**不用 `dtolnay/rust-toolchain`**：它无 release，只有一个 2022 年的浮动 `v1` tag。
+`actionlint` 1.7.12 对改动文件零诊断。
+
+**规则：Windows 通过之前，README 不宣称支持 Windows。** 通过后再按实测更新平台承诺与 MSRV。
+
+### 已知缺口（随本轮 CI 上线）
+- Windows 从未跑过本仓库的测试。symlink 相关语料（含 eric-way 那三条逃逸靶子）在 Windows 上可能需要
+  特权或 Developer Mode —— 这是假设，待 CI 结果证实或推翻，不要先行写进文档。
+- `crates/agent-plugin-lint` 依赖 `libc`（Unix 向），Windows 上的可编译性是待验项。
