@@ -20,7 +20,7 @@ Reports include the location, rule ID, specification section and affected scope:
 
 The linter reads local files, runs offline and does not execute plugin code.
 
-CI checks passed on Linux, macOS and Windows; see [tested scope](REVIEW.md).
+`cargo test` and `cargo clippy` passed in CI on Linux, macOS and Windows.
 
 ## Install
 

@@ -20,7 +20,7 @@
 
 工具读取本地文件，运行时离线，不执行插件代码。
 
-Linux、macOS、Windows 的 CI 检查已通过；见[实测范围](REVIEW.md)。
+Linux、macOS、Windows 上的 `cargo test` 和 `cargo clippy` 均已在 CI 中通过。
 
 ## 安装
 
