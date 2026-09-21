@@ -6,7 +6,7 @@
 
 目标固定 AP 1.0.0；原文 [research/1.0.0.md](research/1.0.0.md) §1–11 权威，schema 有冲突时正文优先。两份 schema 已再次核对 git blob，原始字节存 research/schemas/，来源摘要见 research/PROVENANCE.md。1.1.0 草案不能自动视为兼容。Agent Skills 采用 research/agent-skills-specification.md 日期快照；其没有发布版本，不虚构冻结的上游版本。
 
-只读、运行时零网络。Cargo 构建下载依赖与运行时分开。解析器使用维护中的 YAML 后端，禁止 serde_yaml 0.9。默认使用 serde、serde_json、thiserror；按实际需要引入 serde-saphyr、url、http、semver，提交 Cargo.lock。禁用任何网络 schema resolver。官方 schema 用 include_str!/include_bytes! 编入 plugin crate；可以手写这两份固定 schema 的校验，不实现通用 schema 引擎，不把整份验证的 boolean 映射到整包 fatal。
+只读、运行时零网络。Cargo 构建下载依赖与运行时分开。解析器使用维护中的 YAML 后端，禁止 serde_yaml 0.9。默认使用 serde、serde_json、thiserror；按实际需要引入 serde-saphyr、url、http、semver，提交 Cargo.lock。禁用任何网络 schema resolver。官方 schema 在 crates/agent-plugin-lint/schemas/ 内随 crate 分发，用 include_str!/include_bytes! 编入 plugin crate；研究快照仍留 research/schemas/ 并对照摘要；可以手写这两份固定 schema 的校验，不实现通用 schema 引擎，不把整份验证的 boolean 映射到整包 fatal。
 
 ## 2. Workspace 与模块
 

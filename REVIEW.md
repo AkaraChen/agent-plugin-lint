@@ -28,3 +28,11 @@
 ## 尚未验证
 
 引擎各切片待 review。Windows/macOS、实际宿主加载、安装器产物、MCP 启动/连接/认证/握手、PLUGIN_DATA 生命周期、秘密真实性、域名控制权、完整客户端符合性、发布安装尚未验证。
+
+## S1 首轮：退回
+
+astra 独立执行 workspace test（10 个测试通过）和 clippy（无警告）后，另作 6 个黑盒库 API 回归，**6 个失败**：解析失败后字段 coverage=pass；metadata 数字键被字符串化；属性提取丢弃非法 metadata 值；行数预算漏算 frontmatter；SKILL.md 内部链接被拒；非 UTF-8 目录名被替为空串制造 mismatch。已将完整复现交回 terra。依据 AP §7.1 引用的 AS 格式/metadata/Progressive disclosure，以及 §7.1 的 resolves to regular file；覆盖状态与 IO 分类是本工具正确性契约。此轮不接受 S1，不进入 S2。
+
+S1 第二轮：astra 再跑 20 个集成测试和 clippy 通过；六个旧复现已修复。新增复现仍有两失败：布尔 metadata 键被字符串化；frontmatter unchecked 后字段仍 pass。独立最小依赖实验确认 `deserialize_any` 可严格区分数值/布尔键与带引号或 `!!str` 的字符串键；退回 terra 移除手写事件补丁并修正 coverage。仍未接受 S1。
+
+S1 第三轮接受：astra 独立执行 `cargo test --workspace`（23 个集成测试通过）、`cargo clippy --workspace --all-targets -- -D warnings`、`cargo fmt --all -- --check`、`git diff --check`。另将最初未改动的 6 个 probes 和后续 2 个失败 probes + 1 个依赖实验重新加入临时测试并执行，9/9 通过后移除临时文件。已核对 `deserialize_any` 严格键类型、解析未完成时 dependent coverage=blocked、全文件行数、合法链接、非 UTF-8 路径与原类型错误修复。常规 Unicode/NFKC、未知字段、重复/非字符串 YAML 键仍明确 unchecked；token 预算 manual，位置不猜测。AP §7.1 引用 AS 格式要求；范围不包含完整宿主加载。

@@ -5,3 +5,12 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "离线、只读的 Agent Skills 校验库"
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+serde-saphyr.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
