@@ -3,6 +3,7 @@ use serde::{Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RuleId {
+    ManifestLocation,
     ManifestJson,
     ManifestUnknownField,
     ManifestRequired,
@@ -16,6 +17,10 @@ pub enum RuleId {
     VersionSemver,
     ExtensionsObject,
     ExtensionUnknown,
+    PathManifestEscape,
+    SkillConformance,
+    McpEnvelope,
+    AdviceDuplicateJsonKey,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -32,6 +37,7 @@ pub struct RuleMetadata {
 impl RuleId {
     pub fn as_str(self) -> &'static str {
         match self {
+            Self::ManifestLocation => "AP-MANIFEST-LOCATION",
             Self::ManifestJson => "AP-MANIFEST-JSON",
             Self::ManifestUnknownField => "AP-MANIFEST-UNKNOWN-FIELD",
             Self::ManifestRequired => "AP-MANIFEST-REQUIRED",
@@ -45,6 +51,10 @@ impl RuleId {
             Self::VersionSemver => "AP-VERSION-SEMVER",
             Self::ExtensionsObject => "AP-EXTENSIONS-OBJECT",
             Self::ExtensionUnknown => "AP-EXTENSION-UNKNOWN",
+            Self::PathManifestEscape => "AP-PATH-MANIFEST-ESCAPE",
+            Self::SkillConformance => "AP-SKILL-CONFORMANCE",
+            Self::McpEnvelope => "AP-MCP-ENVELOPE",
+            Self::AdviceDuplicateJsonKey => "AP-ADVICE-DUPLICATE-JSON-KEY",
         }
     }
     pub fn metadata(self) -> RuleMetadata {
@@ -54,6 +64,15 @@ impl RuleId {
         let package = Subject::Package;
         let certain = Confidence::Certain;
         match self {
+            Self::ManifestLocation => RuleMetadata {
+                spec: &["§4.1", "§5.1"],
+                radius: Fatal,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: RejectPlugin,
+            },
             Self::ManifestJson => RuleMetadata {
                 spec: &["§5.2"],
                 radius: Fatal,
@@ -143,6 +162,33 @@ impl RuleId {
                 normative: true,
                 obligation: Must,
                 subject: Subject::Client,
+                confidence: certain,
+                effect: Advise,
+            },
+            Self::PathManifestEscape => RuleMetadata {
+                spec: &["§4.1"],
+                radius: Fatal,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: RejectPlugin,
+            },
+            Self::SkillConformance | Self::McpEnvelope => RuleMetadata {
+                spec: &["§6.2", "§7.1"],
+                radius: Fatal,
+                normative: true,
+                obligation: Must,
+                subject: package,
+                confidence: certain,
+                effect: RejectPlugin,
+            },
+            Self::AdviceDuplicateJsonKey => RuleMetadata {
+                spec: &[],
+                radius: Advisory,
+                normative: false,
+                obligation: Obligation::None,
+                subject: package,
                 confidence: certain,
                 effect: Advise,
             },

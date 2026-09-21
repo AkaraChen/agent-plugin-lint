@@ -42,3 +42,11 @@ S1 第三轮接受：astra 独立执行 `cargo test --workspace`（23 个集成�
 两次旧执行会话提前停止后，换新 terra 会话继续同片。astra 独立执行 34 个集成测试和 clippy 通过；核对 §5.2 两个非 fatal 例外、§5.3 required 抑制、§5.4 类型与禁止格式拒绝、§5.5 名称、§10.2 SemVer 建议、§8.1 未知扩展不定罪。两份内嵌 schema 与研究快照字节、固定 SHA-256 均通过。独立 11 个 probes 有 9 pass、2 fail（obligation 大小写和 rule ID 字典序），已退回修复输出契约，尚未接受此片。
 
 S2a 修订接受：astra 重跑 workspace 的 36 个集成测试、clippy、fmt，均通过；独立 11 probes 原样复验全过。输出 obligation 大写、finding 按序列化 rule ID 字典序排序、manifest 专用规则集合隔离已核实。两份内嵌 schema 再次与研究快照逐字节及 SHA-256 核对一致。此片仅纯库，没有声称 CLI/文件系统/组件检查已执行。
+
+## S2b 首轮：退回
+
+astra 实际执行 46 个测试、clippy、fmt、build，以及 13 个 CLI 用例和 15 个文件系统初版用例，均通过。进一步探针复现：canonicalize 权限错误误作 manifest fatal（应操作错误 2）；参数错误会扫描无关 cwd 并留下残余 summary；manifest 早退缺 blocked coverage；非 UTF-8 CLI 路径被替换；collection root 未按设计输出相对路径。源码发现重复 mode/spec 被静默覆盖。初版重复 mode 用例碰巧因空集合报 2，已强化为有效包 + ARGUMENT 错误断言，避免把测试自身的弱断言当证据。规范门禁依据 §5.1–5.2，JSON/IO/输出路径是工具契约。退回 terra，不接受 S2b。
+
+S2b 第二轮：astra 实际执行 50 个测试、clippy、fmt、build、13 个 CLI + 15 个强化文件系统 + 6 个复现断言全过。发现 IO 分支 coverage 仍误记 location=fail，要求最后修正；没有把无 finding 等同于覆盖状态准确。
+
+S2b 第三轮接受：astra 独立执行 51 个测试、clippy、fmt、build 与强化后的 6 个复现断言，全过；IO coverage 不再伪称规范失败。CLI 的0/1/2、参数/JSON错误、相对root、目录别名、内外manifest链接、FIFO、权限与非UTF8错误已验。读取时文件变化二次核验及组件读取属于S3，尚未验；大小写不敏感文件系统未实机验证，仅检查精确枚举实现。

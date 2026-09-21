@@ -19,6 +19,19 @@ pub enum Effect {
     IgnoreField,
     Advise,
 }
+impl Effect {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::RejectPlugin => "reject-plugin",
+            Self::DisableType => "disable-type",
+            Self::SkipSkill => "skip-skill",
+            Self::SkipServer => "skip-server",
+            Self::DenyPath => "deny-path",
+            Self::IgnoreField => "ignore-field",
+            Self::Advise => "advise",
+        }
+    }
+}
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum Obligation {
@@ -116,4 +129,65 @@ pub struct Finding {
     pub evidence_code: String,
     pub message: String,
     pub hint: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum InputMode {
+    Auto,
+    Plugin,
+    Collection,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct Policy {
+    pub strict: bool,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct ToolError {
+    pub path: String,
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct Summary {
+    pub fatal: usize,
+    pub component: usize,
+    pub ignored: usize,
+    pub advisory: usize,
+    pub errors: usize,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct PluginReport {
+    pub root: String,
+    pub name: Option<String>,
+    #[serde(rename = "declaredSpec")]
+    pub declared_spec: Option<String>,
+    pub status: String,
+    pub findings: Vec<Finding>,
+    pub coverage: Vec<Coverage>,
+}
+
+#[derive(Debug, Clone, Serialize, PartialEq, Eq)]
+pub struct Report {
+    #[serde(rename = "schemaVersion")]
+    pub schema_version: u32,
+    #[serde(rename = "toolVersion")]
+    pub tool_version: String,
+    #[serde(rename = "rulesetVersion")]
+    pub ruleset_version: String,
+    #[serde(rename = "specVersion")]
+    pub spec_version: String,
+    pub input: String,
+    pub mode: InputMode,
+    pub policy: Policy,
+    pub complete: bool,
+    pub plugins: Vec<PluginReport>,
+    pub errors: Vec<ToolError>,
+    pub summary: Summary,
+    #[serde(rename = "exitCode")]
+    pub exit_code: i32,
 }

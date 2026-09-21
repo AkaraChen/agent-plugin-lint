@@ -77,7 +77,7 @@ D6 保守 profile：ASCII 名字确定检查；非 ASCII 长度仍检查，Unico
 
 Finding 字段：ruleId、spec 数组、radius、normative、obligation、subject、confidence、path、pointer、scope、effect、evidenceCode、message、hint，可选 line/column。规范引用使用 § 对应编号，不凭规则索引猜。JSON pointer 必须 RFC6901 转义。消息中文，不输出 env/header/args 原值、源行、秘密摘要。
 
-Report 字段：schemaVersion=1、toolVersion、rulesetVersion、specVersion=1.0.0、input、mode、policy、complete、plugins、errors、summary、exitCode。PluginReport 含 root/name/declaredSpec/status/findings/coverage。Coverage 枚举 Pass/Fail/NotApplicable/Blocked/Unchecked/Manual/Runtime；必须区分检查未实现、父级阻断和不适用。errors 是操作错误，不能计入规范半径。错误优先退出 2，complete=false。summary 按 finding 数计，不把组件数混进去。
+Report 字段：schemaVersion=1、toolVersion、rulesetVersion、specVersion=1.0.0、input、mode、policy、complete、plugins、errors、summary、exitCode。PluginReport 含 root/name/declaredSpec/status/findings/coverage。单包 root 为 `.`，集合中 root 为相对 input 的直接子目录名；finding.path 再相对各包根。status 表示加载门禁结果，不代替 coverage 或完整合规结论。Coverage 枚举 Pass/Fail/NotApplicable/Blocked/Unchecked/Manual/Runtime；必须区分检查未实现、父级阻断和不适用。errors 是操作错误，不能计入规范半径。错误优先退出 2，complete=false。summary 按 finding 数计，不把组件数混进去。
 
 排序：plugin root；finding 按 path/pointer/ruleId/scope/effect；coverage 按 ruleId/target/status；errors 按 path/code。无时间戳。同一输入、平台、版本 JSON 两次运行逐字节相同。稳定消费者依赖枚举、ID、证据码，不能解析人类消息。规范解释变化升 rulesetVersion。
 

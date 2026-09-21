@@ -79,6 +79,17 @@ pub fn validate_manifest(value: &Value) -> ManifestValidation {
     validate_version(manifest, &mut state);
     state.finish()
 }
+pub fn invalid_json_manifest() -> ManifestValidation {
+    let mut state = State::default();
+    state.fail(
+        RuleId::ManifestJson,
+        &[],
+        "JSON_INVALID",
+        "plugin.json 不是有效 JSON",
+    );
+    state.block_all_except(RuleId::ManifestJson, "JSON_INVALID");
+    state.finish()
+}
 #[derive(Default)]
 struct State {
     findings: Vec<Finding>,
