@@ -7,7 +7,7 @@ AP 正文与两份官方 schema 从只读设计目录逐字复制；2026-09-21 �
 
 - AP 1.0.0 SHA-256：`97a658b7dca3ce1b4c2266b95da300fa51d9dc4ade59d73168e5f9104272da18`。
 - [AkaraChen/skills-ref](https://github.com/AkaraChen/skills-ref)：`6c89f06b034240093e4933e066feba3ee1ac0ffa`，仅克隆、只读；旧库不归档。
-- [AkaraChen/eric-way](https://github.com/AkaraChen/eric-way)：`147fe6b840aab1f183cfd22d9f5cb61a14c35d63`，仅克隆、只读；旧库不归档。
+- [AkaraChen/eric-way](https://github.com/AkaraChen/eric-way)：默认 main `147fe6b840aab1f183cfd22d9f5cb61a14c35d63` 已无 plugins；验收检出历史快照 `37d007ca28263d182aab6a5cc62d1bbda246fdfb`，guided-review 子模块 `05a5924108a6a81ce926c23f053a7d74528d5a62`，内容只读；旧库不归档。
 
 1.1.0 是草案；FUTURE_CONSIDERATIONS 非规范；rules.txt 仅作检索索引。
 
