@@ -7,7 +7,7 @@
 	<a href="#license"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="MIT license"></a>
 </p>
 
-A command-line linter that helps [Agent Plugins 1.0.0](https://agent-plugins.org) authors find configuration errors and paths that escape the plugin root before distribution.
+A command-line linter for [Agent Plugins](https://agent-plugins.org), checking for a wide range of problems.
 
 It checks:
 
