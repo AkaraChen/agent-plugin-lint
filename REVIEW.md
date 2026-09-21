@@ -123,7 +123,7 @@ cargo package -p agent-skills-lint --list --offline --allow-dirty
 待飞鸢裁决仍为D3未知扩展作者侧语义、D4默认ignored MUST及strict选择政策、D5欠定语法接受域、D6 AS快照/Unicode裁决、D7宿主与发行范围、D8平台承诺。新库接口形状已按本轮Rust设计落地；旧库归档仍是另行授权的后续动作。
 
 
-## D3–D8 平台续轮（2026-09-21，进行中）
+## D3–D8 平台续轮验收记录（2026-09-21）
 
 本节覆盖前一轮的“未配置远程CI / D3–D8待拍板”历史状态；DECISIONS.md 的追加定案有效，PR #1 保持未合并。astra 使用 Paseo 调度 codex/gpt-5.6-terra（full-access）实现，自己负责设计、源码review与独立执行验证。
 
@@ -178,3 +178,61 @@ fixture review退回过字面量\x01冒充控制字符、过度转义的Windows�
 README定位句按追加标准修订为通用linter描述，c71e7db已直接推main并合入本分支。
 
 D5收口为44个持久边界fixture，另有5个D3/D4单包策略fixture及1个混合集合操作错误优先级场景。各例带规范来源/具体§和定案编号；Rust集成测试在library及实际CLI的default/strict两条路径核对固定预期、目标coverage与finding属性，欠定项无normative MUST，正常对照无finding。command只对保守ASCII核心判已检，其余advisory+unchecked；非ASCIIenv键为advisory。loopback现有保守语义未更改。astra读完生产diff与fixture后独立运行workspace test/clippy/fmt/diffcheck均过，随后才推原生CI。
+
+### astra 独立最终验收（Linux）
+
+在b0d8ed5源码执行以下18项命令均退出0；语料环境变量`AP_LINT_CORPUS=/home/akrc/Developer/eric-way/plugins`。这些命令由astra亲自执行，非引用Terra总结。
+
+```sh
+cargo fmt --all -- --check
+cargo test --workspace --locked --offline
+cargo clippy --workspace --all-targets --locked --offline -- -D warnings
+cargo doc --workspace --no-deps --locked --offline
+cargo build -p agent-plugin-lint --locked --offline
+cargo test -p agent-plugin-lint --test s3 --locked --offline corpus -- --ignored
+python3 scripts/review/cli.py full
+python3 scripts/review/filesystem.py full
+python3 scripts/review/s2b.py
+python3 scripts/review/skills.py
+python3 scripts/review/mcp.py
+python3 scripts/review/json_edges.py
+python3 scripts/review/extensions.py
+python3 scripts/review/coverage.py
+python3 scripts/review/coverage_edges.py
+python3 scripts/review/runtime.py
+cargo package -p agent-plugin-lint --list --offline --allow-dirty
+cargo package -p agent-skills-lint --list --offline --allow-dirty
+```
+
+结果：98个常规Rust测试通过（44个D5 fixture与D3/D4策略矩阵包含在其中2个集成测试中，不将fixture数重复加总）；另显式执行1个默认ignored的真实语料测试。9份Python黑盒脚本共152例通过，0个doctest示例不算额外覆盖。doc/build/两crate包清单通过，未做registry发布或发布包安装。前述README任务额外验证的是main源码的本地cargo install，不能混称当前分支的发布包安装。
+
+真实语料37d007ca：11个plugin、24个skill候选、23个安全SKILL.md、0个mcp.json，确定逃逸仍恰为三条：
+
+| 路径（相对eric-way） | 实际结论 | 依据 |
+| --- | --- | --- |
+| plugins/frontend/skills/e2e-testing/references/docker.md | ignored / deny-path | §4.1(3)，最窄边界第5项 |
+| plugins/review/skills/github-pr/references/viewed-state.md | ignored / deny-path | §4.1(3)，最窄边界第5项 |
+| plugins/review/skills/guided-review | component / skip-skill | §4.1最窄边界第3项、§7.1 |
+
+summary仍为fatal0/component1/ignored2/advisory1/errors0、exit1；额外advisory是未读skill的明确未检查提示。运行期strace三个输入（独立MCP、未知schema、真实语料）均0网络系统调用、命令未执行、内容/链接/权限快照不变；这些运行期观察仅在Linux做过，不算其他平台证据。原设计目录12文件SHA-256仍与基线相同，skills-ref与eric-way HEAD未改且工作区干净。
+
+### D8 原生三平台结果
+
+b0d8ed5 的[原生CI 35605209473](https://github.com/AkaraChen/agent-plugin-lint/actions/runs/35605209473)全部成功。每个平台各自实际执行：
+
+```sh
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+```
+
+| runner | 运行环境 | clippy | Rust测试 |
+| --- | --- | --- | --- |
+| ubuntu-latest | Ubuntu 24.04.5 x86_64 | 通过 | 98通过，0失败；真实外部语料测试默认ignored |
+| macos-latest | macOS 26.6.2 arm64 | 通过 | 98通过，0失败；真实外部语料测试默认ignored |
+| windows-latest | Windows Server 2025 x86_64/MSVC | 通过 | 81通过，0失败；真实外部语料测试默认ignored |
+
+Rust均1.98.1；fmt单独在Ubuntu执行`cargo fmt --all --check`通过。两组D5/D3/D4集成测试的成功记录逐个平台核对，包含实际CLI调用；没有用Linux结果代替macOS/Windows。测试数不同来自平台条件编译，不能把Windows上未编译的Unix链接/FIFO测试算作通过。README仅在此分支更新平台事实行并链接本记录；main只收到双语文案提交，PR #1仍未合并。
+
+验收提交没有为过测试放宽InputChanged、Unsafe、FIFO或schema哈希断言，没有新增ignore逃避失败。增强了同长度/恢复mtime竞态、正文打开时序和FIFO watchdog。中途削弱FIFO攻击时序的实现被退回且未提交。macOS非法UTF-8目录项构造场景明确改列未验，未冒充扫描通过；正文元数据不足时增加内容确认，原生身份能力不足则错误2与unchecked/blocked，不静默通过。
+
+仍未验：Windows junction/链接版eric-way、macOS真实非法UTF-8目录项扫描、实际不支持Windows FileIdInfo的文件系统/网络挂载、完整并发安全或原子快照、macOS/Windows运行期网络系统调用观察、最低Rust版本矩阵、宿主安装/加载、MCP启动连接认证、发布包安装/crates.io发行。D3–D8无新增待拍板项；旧库归档继续留待另行授权。

@@ -20,7 +20,7 @@
 
 工具读取本地文件，运行时离线，不执行插件代码。
 
-平台验证：Linux 已验证；macOS、Windows 尚未验证。
+Linux、macOS、Windows 的 CI 检查已通过；见[实测范围](REVIEW.md)。
 
 ## 安装
 
