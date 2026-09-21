@@ -1,4 +1,4 @@
-use std::fs::{self, OpenOptions};
+use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
@@ -33,6 +33,8 @@ fn unresolved(error: &io::Error) -> bool {
 pub enum ReadError {
     InputChanged,
     Unsafe,
+    #[cfg_attr(unix, allow(dead_code))]
+    Unsupported,
     Io(io::Error),
 }
 impl ReadError {
@@ -61,38 +63,118 @@ struct Identity {
     mtime: i64,
     #[cfg(unix)]
     mtime_nsec: i64,
+    #[cfg(unix)]
+    ctime: i64,
+    #[cfg(unix)]
+    ctime_nsec: i64,
+    #[cfg(windows)]
+    volume_serial: u64,
+    #[cfg(windows)]
+    file_id: [u8; 16],
+    #[cfg(windows)]
+    change_time: i64,
 }
-fn identity(metadata: &fs::Metadata) -> Identity {
+fn identity(file: &File, metadata: &fs::Metadata) -> Result<Identity, ReadError> {
     #[cfg(unix)]
     {
-        use std::os::unix::fs::MetadataExt;
-        Identity {
-            len: metadata.len(),
-            modified: metadata.modified().ok(),
-            dev: metadata.dev(),
-            ino: metadata.ino(),
-            mtime: metadata.mtime(),
-            mtime_nsec: metadata.mtime_nsec(),
-        }
+        let _ = file;
+        Ok(unix_identity(metadata))
     }
-    #[cfg(not(unix))]
+    #[cfg(windows)]
     {
-        Identity {
+        use std::os::windows::io::AsRawHandle;
+        use windows_sys::Win32::Storage::FileSystem::{
+            FILE_BASIC_INFO, FILE_ID_INFO, FileBasicInfo, FileIdInfo, GetFileInformationByHandleEx,
+        };
+
+        let mut id = FILE_ID_INFO::default();
+        // SAFETY: both pointers name initialized buffers of the exact Win32
+        // structure sizes, and `file` owns a valid handle for this call.
+        let id_ok = unsafe {
+            GetFileInformationByHandleEx(
+                file.as_raw_handle(),
+                FileIdInfo,
+                std::ptr::addr_of_mut!(id).cast(),
+                std::mem::size_of::<FILE_ID_INFO>() as u32,
+            )
+        };
+        if id_ok == 0 {
+            return Err(windows_identity_error());
+        }
+        let mut basic = FILE_BASIC_INFO::default();
+        let basic_ok = unsafe {
+            GetFileInformationByHandleEx(
+                file.as_raw_handle(),
+                FileBasicInfo,
+                std::ptr::addr_of_mut!(basic).cast(),
+                std::mem::size_of::<FILE_BASIC_INFO>() as u32,
+            )
+        };
+        if basic_ok == 0 {
+            return Err(windows_identity_error());
+        }
+        Ok(Identity {
             len: metadata.len(),
             modified: metadata.modified().ok(),
+            volume_serial: id.VolumeSerialNumber,
+            file_id: id.FileId.Identifier,
+            change_time: basic.ChangeTime,
+        })
+    }
+    #[cfg(not(any(unix, windows)))]
+    {
+        let _ = (file, metadata);
+        Err(ReadError::Unsupported)
+    }
+}
+#[cfg(unix)]
+fn unix_identity(metadata: &fs::Metadata) -> Identity {
+    use std::os::unix::fs::MetadataExt;
+    Identity {
+        len: metadata.len(),
+        modified: metadata.modified().ok(),
+        dev: metadata.dev(),
+        ino: metadata.ino(),
+        mtime: metadata.mtime(),
+        mtime_nsec: metadata.mtime_nsec(),
+        ctime: metadata.ctime(),
+        ctime_nsec: metadata.ctime_nsec(),
+    }
+}
+#[cfg(windows)]
+fn windows_identity_error() -> ReadError {
+    use windows_sys::Win32::Foundation::{
+        ERROR_CALL_NOT_IMPLEMENTED, ERROR_INVALID_FUNCTION, ERROR_INVALID_PARAMETER,
+        ERROR_NOT_SUPPORTED,
+    };
+
+    let error = io::Error::last_os_error();
+    match error.raw_os_error() {
+        Some(code)
+            if code == ERROR_INVALID_FUNCTION as i32
+                || code == ERROR_NOT_SUPPORTED as i32
+                || code == ERROR_INVALID_PARAMETER as i32
+                || code == ERROR_CALL_NOT_IMPLEMENTED as i32 =>
+        {
+            ReadError::Unsupported
         }
+        _ => ReadError::Io(error),
     }
 }
 
 /// Read a contained regular file with identity/path rechecks. Unix uses
 /// O_NONBLOCK so a FIFO substitution cannot block. This is change detection,
-/// not an atomic filesystem sandbox; non-Unix identity is necessarily weaker.
+/// not an atomic filesystem sandbox.
 pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
     // Keep this resolved boundary for the whole operation.  In particular, do
     // not resolve the root again after a hook/open: a replacement at its
     // original spelling must not make a new directory an accepted boundary.
     let root = fs::canonicalize(root)?;
     let before_path = fs::canonicalize(path)?;
+    #[cfg(test)]
+    if forced_unsupported(&before_path) {
+        return Err(ReadError::Unsupported);
+    }
     if !before_path.starts_with(&root) {
         return Err(ReadError::Unsafe);
     }
@@ -100,8 +182,55 @@ pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
     if !before_metadata.is_file() {
         return Err(ReadError::Unsafe);
     }
-    let before = identity(&before_metadata);
+    let guard = open_read(&before_path).map_err(after_open_error)?;
+    let guard_before = guard.metadata()?;
+    if !guard_before.is_file() {
+        return Err(ReadError::InputChanged);
+    }
+    if before_metadata.len() != guard_before.len()
+        || before_metadata.modified().ok() != guard_before.modified().ok()
+    {
+        return Err(ReadError::InputChanged);
+    }
+    let before = identity(&guard, &guard_before)?;
+    #[cfg(unix)]
+    if unix_identity(&before_metadata) != before {
+        return Err(ReadError::InputChanged);
+    }
     test_hook(HookPoint::BeforeOpen);
+    let mut file = open_read(path).map_err(after_open_error)?;
+    test_hook(HookPoint::AfterOpen);
+    let read_before = file.metadata()?;
+    if !read_before.is_file() || identity(&file, &read_before)? != before {
+        return Err(ReadError::InputChanged);
+    }
+    let mut source = String::new();
+    file.read_to_string(&mut source)?;
+    test_hook(HookPoint::AfterRead);
+    let read_after = file.metadata()?;
+    let guard_after = guard.metadata()?;
+    let after_path = fs::canonicalize(path).map_err(|_| ReadError::InputChanged)?;
+    if after_path != before_path || !after_path.starts_with(&root) {
+        return Err(ReadError::InputChanged);
+    }
+    let after_metadata = fs::metadata(&after_path).map_err(|_| ReadError::InputChanged)?;
+    if !after_metadata.is_file() {
+        return Err(ReadError::InputChanged);
+    }
+    let path_file = open_read(path).map_err(|_| ReadError::InputChanged)?;
+    let path_handle = path_file.metadata().map_err(|_| ReadError::InputChanged)?;
+    if !read_after.is_file()
+        || identity(&file, &read_after)? != before
+        || !guard_after.is_file()
+        || identity(&guard, &guard_after)? != before
+        || !path_handle.is_file()
+        || identity(&path_file, &path_handle)? != before
+    {
+        return Err(ReadError::InputChanged);
+    }
+    Ok(source)
+}
+fn open_read(path: &Path) -> io::Result<File> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]
@@ -109,27 +238,7 @@ pub fn read_safe(root: &Path, path: &Path) -> Result<String, ReadError> {
         use std::os::unix::fs::OpenOptionsExt;
         options.custom_flags(libc::O_NONBLOCK);
     }
-    let mut file = options.open(path).map_err(after_open_error)?;
-    let handle_before = file.metadata()?;
-    if !handle_before.is_file() || identity(&handle_before) != before {
-        return Err(ReadError::InputChanged);
-    }
-    let mut source = String::new();
-    file.read_to_string(&mut source)?;
-    test_hook(HookPoint::AfterRead);
-    let handle_after = file.metadata()?;
-    let after_path = fs::canonicalize(path).map_err(|_| ReadError::InputChanged)?;
-    if after_path != before_path || !after_path.starts_with(&root) {
-        return Err(ReadError::InputChanged);
-    }
-    let after_metadata = fs::metadata(&after_path).map_err(|_| ReadError::InputChanged)?;
-    if !handle_after.is_file()
-        || identity(&handle_after) != before
-        || identity(&after_metadata) != before
-    {
-        return Err(ReadError::InputChanged);
-    }
-    Ok(source)
+    options.open(path)
 }
 fn after_open_error(error: io::Error) -> ReadError {
     if matches!(
@@ -151,21 +260,32 @@ pub fn directory(path: &Path) -> io::Result<bool> {
 #[derive(Clone, Copy)]
 enum HookPoint {
     BeforeOpen,
+    AfterOpen,
     AfterRead,
 }
 #[cfg(test)]
-type TestHook = Box<dyn Fn(HookPoint) + Send + Sync>;
+type TestHook = Box<dyn Fn(HookPoint)>;
 #[cfg(test)]
-static TEST_HOOK: std::sync::Mutex<Option<TestHook>> = std::sync::Mutex::new(None);
+std::thread_local! {
+    static TEST_HOOK: std::cell::RefCell<Option<TestHook>> = const { std::cell::RefCell::new(None) };
+    static TEST_FORCE_UNSUPPORTED: std::cell::RefCell<Option<PathBuf>> = const { std::cell::RefCell::new(None) };
+}
+#[cfg(test)]
+fn forced_unsupported(path: &Path) -> bool {
+    TEST_FORCE_UNSUPPORTED.with(|forced| forced.borrow().as_deref() == Some(path))
+}
+#[cfg(test)]
+pub(crate) fn set_test_force_unsupported(path: Option<PathBuf>) {
+    TEST_FORCE_UNSUPPORTED
+        .with(|forced| *forced.borrow_mut() = path.and_then(|path| fs::canonicalize(path).ok()));
+}
 #[cfg(test)]
 fn test_hook(point: HookPoint) {
-    if let Some(hook) = TEST_HOOK
-        .lock()
-        .unwrap_or_else(std::sync::PoisonError::into_inner)
-        .as_ref()
-    {
-        hook(point);
-    }
+    TEST_HOOK.with(|hook| {
+        if let Some(hook) = hook.borrow().as_ref() {
+            hook(point);
+        }
+    });
 }
 #[cfg(not(test))]
 fn test_hook(_: HookPoint) {}
@@ -188,11 +308,11 @@ mod tests {
     struct HookGuard;
     impl Drop for HookGuard {
         fn drop(&mut self) {
-            *unpoisoned_lock(&TEST_HOOK) = None;
+            TEST_HOOK.with(|hook| *hook.borrow_mut() = None);
         }
     }
-    fn with_hook(f: impl Fn(HookPoint) + Send + Sync + 'static) -> HookGuard {
-        *unpoisoned_lock(&TEST_HOOK) = Some(Box::new(f));
+    fn with_hook(f: impl Fn(HookPoint) + 'static) -> HookGuard {
+        TEST_HOOK.with(|hook| *hook.borrow_mut() = Some(Box::new(f)));
         HookGuard
     }
     #[test]
@@ -248,6 +368,89 @@ mod tests {
         let alias = temp.path().join("alias");
         symlink(&root, &alias).unwrap();
         assert_eq!(read_safe(&alias, &file).unwrap(), "ordinary");
+    }
+    fn restore_mtime(path: &Path, metadata: &fs::Metadata) {
+        let times = fs::FileTimes::new().set_modified(metadata.modified().unwrap());
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)
+            .unwrap()
+            .set_times(times)
+            .unwrap();
+    }
+    #[test]
+    fn detects_same_length_changes_with_restored_mtime() {
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let file = temp.path().join("file");
+        fs::write(&file, "one").unwrap();
+        let original = fs::metadata(&file).unwrap();
+        let copy = file.clone();
+        {
+            let _hook = with_hook(move |point| {
+                if matches!(point, HookPoint::BeforeOpen) {
+                    fs::remove_file(&copy).unwrap();
+                    fs::write(&copy, "two").unwrap();
+                    restore_mtime(&copy, &original);
+                    let current = fs::metadata(&copy).unwrap();
+                    assert_eq!(current.len(), original.len());
+                    assert_eq!(current.modified().unwrap(), original.modified().unwrap());
+                }
+            });
+            assert!(matches!(
+                read_safe(temp.path(), &file),
+                Err(ReadError::InputChanged)
+            ));
+        }
+        fs::write(&file, "one").unwrap();
+        let original = fs::metadata(&file).unwrap();
+        let copy = file.clone();
+        let _hook = with_hook(move |point| {
+            if matches!(point, HookPoint::AfterRead) {
+                fs::remove_file(&copy).unwrap();
+                fs::write(&copy, "two").unwrap();
+                restore_mtime(&copy, &original);
+                let current = fs::metadata(&copy).unwrap();
+                assert_eq!(current.len(), original.len());
+                assert_eq!(current.modified().unwrap(), original.modified().unwrap());
+            }
+        });
+        assert!(matches!(
+            read_safe(temp.path(), &file),
+            Err(ReadError::InputChanged)
+        ));
+    }
+    #[cfg(windows)]
+    #[test]
+    fn windows_file_id_distinguishes_same_length_same_mtime_files() {
+        let _serial = unpoisoned_lock(&TEST_SERIAL);
+        let temp = TempDir::new().unwrap();
+        let first = temp.path().join("first");
+        let second = temp.path().join("second");
+        fs::write(&first, "one").unwrap();
+        let first_metadata = fs::metadata(&first).unwrap();
+        fs::write(&second, "two").unwrap();
+        restore_mtime(&second, &first_metadata);
+        let second_metadata = fs::metadata(&second).unwrap();
+        assert_eq!(first_metadata.len(), second_metadata.len());
+        assert_eq!(
+            first_metadata.modified().unwrap(),
+            second_metadata.modified().unwrap()
+        );
+        let first_file = File::open(&first).unwrap();
+        let second_file = File::open(&second).unwrap();
+        let first_identity = identity(&first_file, &first_file.metadata().unwrap()).unwrap();
+        let second_identity = identity(&second_file, &second_file.metadata().unwrap()).unwrap();
+        assert_ne!(
+            (first_identity.volume_serial, first_identity.file_id),
+            (second_identity.volume_serial, second_identity.file_id)
+        );
+        let first_again = File::open(&first).unwrap();
+        assert_eq!(
+            identity(&first_again, &first_again.metadata().unwrap()).unwrap(),
+            first_identity
+        );
     }
     #[cfg(unix)]
     #[test]
@@ -328,6 +531,8 @@ mod tests {
         let file = temp.path().join("file");
         fs::write(&file, "ordinary").unwrap();
         let copy = file.clone();
+        let opened = Arc::new(AtomicBool::new(false));
+        let opened_copy = opened.clone();
         let _hook = with_hook(move |point| {
             if matches!(point, HookPoint::BeforeOpen) {
                 fs::remove_file(&copy).unwrap();
@@ -339,10 +544,14 @@ mod tests {
                         .success()
                 );
             }
+            if matches!(point, HookPoint::AfterOpen) {
+                opened_copy.store(true, Ordering::SeqCst);
+            }
         });
         assert!(matches!(
             read_safe(temp.path(), &file),
             Err(ReadError::InputChanged)
         ));
+        assert!(opened.load(Ordering::SeqCst));
     }
 }

@@ -256,6 +256,30 @@ fn non_utf8_paths_are_operational_errors() {
     assert_eq!(report.input, "<non-utf8-path>");
 }
 
+#[cfg(unix)]
+#[test]
+fn manifest_link_loops_are_unresolved_location_failures() {
+    use std::os::unix::fs::symlink;
+    for two_nodes in [false, true] {
+        let temp = TempDir::new().unwrap();
+        if two_nodes {
+            symlink("other", temp.path().join("plugin.json")).unwrap();
+            symlink("plugin.json", temp.path().join("other")).unwrap();
+        } else {
+            symlink("plugin.json", temp.path().join("plugin.json")).unwrap();
+        }
+        let report = lint_path(temp.path(), options(InputMode::Plugin));
+        assert_eq!(report.exit_code, 1);
+        assert!(report.errors.is_empty());
+        assert!(
+            report.plugins[0]
+                .findings
+                .iter()
+                .any(|finding| finding.rule_id.as_str() == "AP-MANIFEST-LOCATION")
+        );
+    }
+}
+
 #[cfg(all(unix, not(target_os = "macos")))]
 #[test]
 fn non_utf8_collection_child_is_not_silently_skipped() {
@@ -277,10 +301,11 @@ fn non_utf8_collection_child_is_not_silently_skipped() {
 
 #[cfg(target_os = "macos")]
 #[test]
-fn apfs_rejects_non_utf8_collection_child_creation() {
+fn macos_filesystem_rejects_non_utf8_collection_child_creation() {
     let temp = TempDir::new().unwrap();
     let invalid = temp.path().join(non_utf8_component());
-    let error = fs::create_dir(&invalid).expect_err("APFS rejects invalid UTF-8 bytes");
+    let error =
+        fs::create_dir(&invalid).expect_err("runner filesystem rejects invalid UTF-8 bytes");
     assert_eq!(error.raw_os_error(), Some(libc::EILSEQ));
 }
 

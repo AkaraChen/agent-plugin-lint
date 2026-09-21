@@ -310,6 +310,9 @@ fn lint_plugin(root: &Path, root_name: String) -> PluginOutcome {
                             "MANIFEST_READ",
                             "plugin.json 不是可安全读取的普通文件",
                         ),
+                        Err(crate::containment::ReadError::Unsupported) => {
+                            outcome_safe_read_unsupported(root_name, &manifest_path)
+                        }
                         Err(read_error @ crate::containment::ReadError::Io(_)) => {
                             let _ = read_error.io_kind();
                             outcome_error(
@@ -972,6 +975,20 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                                 reason_code: Some("SKILL_READ_IO".into()),
                             });
                         }
+                        Err(crate::containment::ReadError::Unsupported) => {
+                            error(
+                                errors,
+                                &md,
+                                "SAFE_READ_UNSUPPORTED",
+                                "当前平台无法安全读取 SKILL.md 内容",
+                            );
+                            plugin.coverage.push(Coverage {
+                                rule_id: RuleId::SkillConformance.as_str().into(),
+                                target: md_logical,
+                                status: CoverageStatus::Unchecked,
+                                reason_code: Some("SAFE_READ_UNSUPPORTED".into()),
+                            });
+                        }
                         Err(read_error @ crate::containment::ReadError::Io(_)) => {
                             let _ = read_error.io_kind();
                             error(errors, &md, "SKILL_READ_IO", "无法安全读取 SKILL.md 内容");
@@ -1265,6 +1282,25 @@ fn outcome_error(root: String, path: &Path, code: &str, message: &str) -> Plugin
         errors: vec![tool_error(path, code, message)],
     }
 }
+fn outcome_safe_read_unsupported(root: String, path: &Path) -> PluginOutcome {
+    let mut plugin = unread_plugin(root);
+    if let Some(coverage) = plugin
+        .coverage
+        .iter_mut()
+        .find(|coverage| coverage.rule_id == RuleId::ManifestLocation.as_str())
+    {
+        coverage.status = CoverageStatus::Unchecked;
+        coverage.reason_code = Some("SAFE_READ_UNSUPPORTED".into());
+    }
+    PluginOutcome {
+        plugin,
+        errors: vec![tool_error(
+            path,
+            "SAFE_READ_UNSUPPORTED",
+            "当前平台无法安全读取 plugin.json 内容",
+        )],
+    }
+}
 fn unread_plugin(root: String) -> PluginReport {
     PluginReport {
         root,
@@ -1276,7 +1312,8 @@ fn unread_plugin(root: String) -> PluginReport {
     }
 }
 fn unresolved_location(error: &std::io::Error) -> bool {
-    error.kind() == std::io::ErrorKind::NotFound || (cfg!(unix) && error.raw_os_error() == Some(40)) // ELOOP
+    error.kind() == std::io::ErrorKind::NotFound
+        || (cfg!(unix) && error.raw_os_error() == Some(libc::ELOOP))
 }
 
 fn finish_report(report: &mut Report) {
@@ -1450,4 +1487,94 @@ fn scope_key(scope: &Scope) -> (&str, Option<&str>) {
 }
 fn display(path: &Path) -> String {
     path.to_str().unwrap_or("<non-utf8-path>").into()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::TempDir;
+
+    struct UnsupportedGuard;
+    impl UnsupportedGuard {
+        fn enable(path: PathBuf) -> Self {
+            crate::containment::set_test_force_unsupported(Some(path));
+            Self
+        }
+    }
+    impl Drop for UnsupportedGuard {
+        fn drop(&mut self) {
+            crate::containment::set_test_force_unsupported(None);
+        }
+    }
+    fn has_unchecked(coverage: &[Coverage], rule: RuleId, target: &str) -> bool {
+        coverage.iter().any(|coverage| {
+            coverage.rule_id == rule.as_str()
+                && coverage.target == target
+                && coverage.status == CoverageStatus::Unchecked
+                && coverage.reason_code.as_deref() == Some("SAFE_READ_UNSUPPORTED")
+        })
+    }
+    fn assert_final(report: &Report, rule: RuleId, target: &str) {
+        assert_eq!(report.exit_code, 2);
+        assert!(!report.complete);
+        assert!(
+            report
+                .errors
+                .iter()
+                .any(|error| error.code == "SAFE_READ_UNSUPPORTED")
+        );
+        assert!(
+            report
+                .plugins
+                .iter()
+                .all(|plugin| plugin.findings.iter().all(|finding| !finding.normative))
+        );
+        assert!(
+            report
+                .plugins
+                .iter()
+                .any(|plugin| has_unchecked(&plugin.coverage, rule, target))
+        );
+        let json = serde_json::to_value(report).unwrap();
+        assert_eq!(json["exitCode"], 2);
+        assert_eq!(json["complete"], false);
+    }
+
+    #[test]
+    fn safe_read_unsupported_is_a_tool_error_without_findings() {
+        let temp = TempDir::new().unwrap();
+        fs::write(
+            temp.path().join("plugin.json"),
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"a"}"#,
+        )
+        .unwrap();
+        let _guard = UnsupportedGuard::enable(temp.path().join("plugin.json"));
+        let report = lint_path(temp.path(), LintOptions::default());
+        assert_final(&report, RuleId::ManifestLocation, "plugin.json");
+    }
+
+    #[test]
+    fn safe_read_unsupported_stops_skill_and_mcp_parsing() {
+        let temp = TempDir::new().unwrap();
+        fs::write(
+            temp.path().join("plugin.json"),
+            r#"{"$schema":"https://agent-plugins.org/schemas/1.0.0/plugin.schema.json","name":"a"}"#,
+        )
+        .unwrap();
+        let skill = temp.path().join("skills/a");
+        fs::create_dir_all(&skill).unwrap();
+        fs::write(skill.join("SKILL.md"), "not valid frontmatter").unwrap();
+        fs::write(temp.path().join("mcp.json"), "not json").unwrap();
+        fs::remove_file(temp.path().join("mcp.json")).unwrap();
+        let _guard = UnsupportedGuard::enable(skill.join("SKILL.md"));
+        let skill_report = lint_path(temp.path(), LintOptions::default());
+        assert_final(&skill_report, RuleId::SkillConformance, "skills/a/SKILL.md");
+
+        drop(_guard);
+        fs::remove_dir_all(temp.path().join("skills")).unwrap();
+        fs::write(temp.path().join("mcp.json"), "not json").unwrap();
+        let _guard = UnsupportedGuard::enable(temp.path().join("mcp.json"));
+        let mcp_report = lint_path(temp.path(), LintOptions::default());
+        assert_final(&mcp_report, RuleId::McpEnvelope, "mcp.json");
+    }
 }

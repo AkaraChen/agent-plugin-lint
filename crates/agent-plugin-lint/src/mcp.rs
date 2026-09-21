@@ -142,6 +142,21 @@ pub(crate) fn scan(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<Tool
                                 "MCP_READ",
                             );
                         }
+                        Err(ReadError::Unsupported) => {
+                            error(
+                                errors,
+                                &path,
+                                "SAFE_READ_UNSUPPORTED",
+                                "当前平台无法安全读取 mcp.json 内容",
+                            );
+                            coverage(
+                                plugin,
+                                RuleId::McpEnvelope,
+                                "mcp.json",
+                                CoverageStatus::Unchecked,
+                                "SAFE_READ_UNSUPPORTED",
+                            );
+                        }
                         Err(ReadError::Io(_)) => {
                             error(errors, &path, "MCP_READ", "无法读取 mcp.json 内容");
                             coverage(

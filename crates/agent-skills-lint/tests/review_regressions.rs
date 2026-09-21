@@ -92,7 +92,8 @@ fn invalid_utf8_name_not_content_error() {
     use std::os::unix::ffi::OsStringExt;
     let t = tempfile::tempdir().unwrap();
     let d = t.path().join(std::ffi::OsString::from_vec(vec![0xff]));
-    std::fs::create_dir(&d).unwrap();
-    std::fs::write(d.join("SKILL.md"), "---\nname: a\ndescription: ok\n---\n").unwrap();
-    assert!(validate_directory(&d).is_err());
+    assert!(matches!(
+        validate_directory(&d),
+        Err(SkillIoError::NonUtf8Directory(path)) if path == d
+    ));
 }

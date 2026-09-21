@@ -23,11 +23,11 @@ pub fn validate_source(source: &str, directory_name: &str) -> SkillReport {
 }
 /// 目录便利 API；只有文件系统失败会作为 `Err` 返回。
 pub fn validate_directory(dir: &Path) -> Result<SkillReport, SkillIoError> {
-    let source = read_source(dir)?;
     let directory_name = dir
         .file_name()
         .and_then(|x| x.to_str())
         .ok_or_else(|| SkillIoError::NonUtf8Directory(dir.to_path_buf()))?;
+    let source = read_source(dir)?;
     Ok(validate_source(&source, directory_name))
 }
 fn parse_error(error: ParseError, report: &mut SkillReport) {
