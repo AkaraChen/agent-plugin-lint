@@ -1,0 +1,3 @@
+# Vendored schemas are byte-identified snapshots; never rewrite their line endings.
+research/schemas/*.json -text
+crates/agent-plugin-lint/schemas/*.json -text
