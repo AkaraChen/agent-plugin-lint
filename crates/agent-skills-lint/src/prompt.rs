@@ -1,5 +1,5 @@
-use crate::{ReadPropertiesError, find_skill_md, read_properties};
-use std::path::PathBuf;
+use crate::{ReadPropertiesError, SkillIoError, find_skill_md, read_properties};
+use std::path::{Path, PathBuf};
 fn escape(value: &str) -> String {
     value
         .replace('&', "&amp;")
@@ -12,7 +12,8 @@ fn escape(value: &str) -> String {
 pub fn to_prompt(directories: &[PathBuf]) -> Result<String, ReadPropertiesError> {
     let mut lines = vec!["<available_skills>".to_owned()];
     for directory in directories {
-        let p = read_properties(directory)?;
+        let directory = utf8_path(directory)?;
+        let p = read_properties(Path::new(directory))?;
         lines.extend([
             "<skill>".to_owned(),
             "<name>".to_owned(),
@@ -22,10 +23,10 @@ pub fn to_prompt(directories: &[PathBuf]) -> Result<String, ReadPropertiesError>
             escape(&p.description),
             "</description>".to_owned(),
         ]);
-        if let Some(path) = find_skill_md(directory) {
+        if let Some(path) = find_skill_md(Path::new(directory)) {
             lines.extend([
                 "<location>".to_owned(),
-                escape(&path.display().to_string()),
+                escape(utf8_path(&path)?),
                 "</location>".to_owned(),
             ]);
         }
@@ -33,4 +34,9 @@ pub fn to_prompt(directories: &[PathBuf]) -> Result<String, ReadPropertiesError>
     }
     lines.push("</available_skills>".to_owned());
     Ok(lines.join("\n"))
+}
+
+fn utf8_path(path: &Path) -> Result<&str, ReadPropertiesError> {
+    path.to_str()
+        .ok_or_else(|| ReadPropertiesError::Io(SkillIoError::NonUtf8Path(path.to_path_buf())))
 }

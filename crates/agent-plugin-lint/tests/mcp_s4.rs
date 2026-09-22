@@ -254,3 +254,187 @@ fn raw_symlink_parent_cwd_uses_kernel_resolution() {
     let r = report(&temp);
     assert!(has(&r, "AP-PATH-SERVER-ESCAPE"));
 }
+
+#[test]
+fn empty_server_map_is_not_applicable_rather_than_unevaluated() {
+    let temp = fixture(mcp(json!({})));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 0);
+    for rule in [
+        "AP-MCP-COMMAND",
+        "AP-MCP-URL",
+        "AP-MCP-HEADERS",
+        "AP-PATH-RELATIVE-FORM",
+    ] {
+        assert!(
+            report.plugins[0].coverage.iter().any(|coverage| {
+                coverage.rule_id == rule
+                    && coverage.target == "mcp.json"
+                    && coverage.status == CoverageStatus::NotApplicable
+                    && coverage.reason_code.as_deref() == Some("NO_SERVERS")
+            }),
+            "{rule} {:#?}",
+            report.plugins[0].coverage
+        );
+    }
+}
+
+#[test]
+fn rejected_stdio_command_blocks_the_checks_that_did_not_run() {
+    let temp = fixture(mcp(json!({"s":{"type":"stdio","command":"../bin/server"}})));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 1);
+    assert!(has(&report, "AP-MCP-COMMAND"));
+    for rule in ["AP-MCP-CWD-FORM", "AP-MCP-RESERVED-ENV"] {
+        assert!(
+            report.plugins[0].coverage.iter().any(|coverage| {
+                coverage.rule_id == rule
+                    && coverage.target.contains("/mcpServers/s/")
+                    && coverage.status == CoverageStatus::Blocked
+            }),
+            "{rule}"
+        );
+    }
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-URL"
+            && coverage.status == CoverageStatus::NotApplicable
+            && coverage.reason_code.as_deref() == Some("STDIO_NO_REMOTE")
+    }));
+}
+
+#[test]
+fn reserved_env_blocks_cwd_instead_of_leaving_it_unevaluated() {
+    let temp = fixture(mcp(
+        json!({"s":{"type":"stdio","command":"node","env":{"PLUGIN_ROOT":"x"}}}),
+    ));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 1);
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-CWD-FORM"
+            && coverage.target.ends_with("/cwd")
+            && coverage.status == CoverageStatus::Blocked
+            && coverage.reason_code.as_deref() == Some("RESERVED_ENV")
+    }));
+}
+
+#[test]
+fn unresolved_dot_command_records_command_coverage_without_a_must() {
+    let temp = fixture(mcp(json!({"s":{"type":"stdio","command":"./missing"}})));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 0);
+    assert!(!has(&report, "AP-MCP-COMMAND"));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-COMMAND"
+            && coverage.target.ends_with("/mcpServers/s/command")
+            && coverage.status == CoverageStatus::Unchecked
+            && coverage.reason_code.as_deref() == Some("PATH_UNRESOLVED")
+    }));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-PATH-RELATIVE-FORM"
+            && coverage.target.ends_with("/command")
+            && coverage.status == CoverageStatus::Pass
+    }));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-PATH-SERVER-ESCAPE"
+            && coverage.target.ends_with("/command")
+            && coverage.status == CoverageStatus::Unchecked
+            && coverage.reason_code.as_deref() == Some("PATH_UNRESOLVED")
+    }));
+    assert!(report.plugins[0].coverage.iter().all(|coverage| {
+        !(coverage.rule_id == "AP-MCP-COMMAND"
+            && coverage.reason_code.as_deref() == Some("RULE_NOT_EVALUATED"))
+    }));
+}
+
+#[test]
+fn invalid_cwd_form_blocks_server_escape() {
+    let temp = fixture(mcp(
+        json!({"s":{"type":"stdio","command":"node","cwd":"../x"}}),
+    ));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 1);
+    assert!(has(&report, "AP-MCP-CWD-FORM"));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-PATH-SERVER-ESCAPE"
+            && coverage.target.ends_with("/mcpServers/s/cwd")
+            && coverage.status == CoverageStatus::Blocked
+            && coverage.reason_code.as_deref() == Some("CWD_FORM")
+    }));
+    assert!(report.plugins[0].coverage.iter().all(|coverage| {
+        !(coverage.rule_id == "AP-PATH-SERVER-ESCAPE"
+            && coverage.reason_code.as_deref() == Some("RULE_NOT_EVALUATED"))
+    }));
+}
+
+#[test]
+fn unresolved_cwd_records_cwd_form() {
+    let temp = fixture(mcp(
+        json!({"s":{"type":"stdio","command":"node","cwd":"./missing"}}),
+    ));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 0);
+    assert!(!has(&report, "AP-MCP-CWD-FORM"));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-CWD-FORM"
+            && coverage.target.ends_with("/mcpServers/s/cwd")
+            && coverage.status == CoverageStatus::Unchecked
+            && coverage.reason_code.as_deref() == Some("PATH_UNRESOLVED")
+    }));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-PATH-SERVER-ESCAPE"
+            && coverage.target.ends_with("/cwd")
+            && coverage.status == CoverageStatus::Unchecked
+            && coverage.reason_code.as_deref() == Some("PATH_UNRESOLVED")
+    }));
+}
+
+#[cfg(unix)]
+#[test]
+fn escaped_cwd_symlink_records_cwd_form_as_blocked() {
+    use std::os::unix::fs::symlink;
+    let temp = fixture(mcp(
+        json!({"s":{"type":"stdio","command":"node","cwd":"./out"}}),
+    ));
+    let outside = TempDir::new().unwrap();
+    symlink(outside.path(), temp.path().join("out")).unwrap();
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 1);
+    assert!(has(&report, "AP-PATH-SERVER-ESCAPE"));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-CWD-FORM"
+            && coverage.target.ends_with("/mcpServers/s/cwd")
+            && coverage.status == CoverageStatus::Blocked
+            && coverage.reason_code.as_deref() == Some("SERVER_OUTSIDE_ROOT")
+    }));
+}
+
+#[test]
+fn https_failure_records_the_url_form_and_blocks_headers() {
+    let temp = fixture(mcp(json!({
+        "s": {
+            "type": "sse",
+            "url": "http://api.example/x",
+            "headers": {"X-Token": "secret"}
+        }
+    })));
+    let report = report(&temp);
+    assert_eq!(report.exit_code, 1);
+    assert!(has(&report, "AP-MCP-HTTPS"));
+    assert!(!has(&report, "AP-ADVICE-POSSIBLE-SECRET"));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-URL"
+            && coverage.target.ends_with("/url")
+            && coverage.status == CoverageStatus::Pass
+            && coverage.reason_code.as_deref() == Some("URL_VALID")
+    }));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-HEADERS"
+            && coverage.status == CoverageStatus::Blocked
+            && coverage.reason_code.as_deref() == Some("MCP_HTTPS")
+    }));
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AP-MCP-COMMAND"
+            && coverage.status == CoverageStatus::NotApplicable
+            && coverage.reason_code.as_deref() == Some("REMOTE_NO_STDIO")
+    }));
+}

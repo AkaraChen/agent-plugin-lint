@@ -136,6 +136,8 @@ pub enum SkillIoError {
     NotDirectory(PathBuf),
     #[error("directory name is not valid UTF-8: {0}")]
     NonUtf8Directory(PathBuf),
+    #[error("path is not valid UTF-8")]
+    NonUtf8Path(PathBuf),
     #[error("missing SKILL.md: {0}")]
     MissingSkillFile(PathBuf),
     #[error("failed to read {path}: {source}")]

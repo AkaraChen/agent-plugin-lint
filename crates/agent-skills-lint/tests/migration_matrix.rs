@@ -120,3 +120,18 @@ fn directory_missing_not_directory_case_and_multiple_prompt_matrix() {
     let xml = to_prompt(&[temp.path().join("one"), temp.path().join("two")]).unwrap();
     assert_eq!(xml.matches("<skill>").count(), 2);
 }
+
+#[cfg(unix)]
+#[test]
+fn prompt_rejects_non_utf8_paths_without_lossy_text() {
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+    use std::path::PathBuf;
+    let path = PathBuf::from(OsString::from_vec(b"bad\xff".to_vec()));
+    match to_prompt(&[path]).unwrap_err() {
+        ReadPropertiesError::Io(SkillIoError::NonUtf8Path(path)) => {
+            assert!(path.to_str().is_none());
+        }
+        other => panic!("expected a non-UTF-8 path error, got {other:?}"),
+    }
+}

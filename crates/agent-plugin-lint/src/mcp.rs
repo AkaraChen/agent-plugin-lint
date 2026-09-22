@@ -322,9 +322,42 @@ fn envelope(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolError>,
         CoverageStatus::Pass,
         "MCP_VERSION_MATCH",
     );
-    for (name, entry) in object["mcpServers"].as_object().expect("object checked") {
+    let servers = object["mcpServers"].as_object().expect("object checked");
+    if servers.is_empty() {
+        mark_no_servers(plugin);
+        return;
+    }
+    for (name, entry) in servers {
         server(root, plugin, errors, name, entry);
     }
+}
+
+fn mark_no_servers(plugin: &mut PluginReport) {
+    for rule in [
+        RuleId::McpServerVariant,
+        RuleId::McpCommand,
+        RuleId::McpCwdForm,
+        RuleId::PathServerEscape,
+        RuleId::McpUrl,
+        RuleId::McpHttps,
+        RuleId::McpHeaders,
+        RuleId::McpReservedEnv,
+    ] {
+        record_absent(
+            plugin,
+            rule.as_str(),
+            "mcp.json",
+            CoverageStatus::NotApplicable,
+            "NO_SERVERS",
+        );
+    }
+    record_absent(
+        plugin,
+        "AP-PATH-RELATIVE-FORM",
+        "mcp.json",
+        CoverageStatus::NotApplicable,
+        "NO_SERVERS",
+    );
 }
 
 fn server(
@@ -399,6 +432,7 @@ fn stdio(
         CoverageStatus::Pass,
         "STDIO_VARIANT_VALID",
     );
+    record_stdio_remote_absence(plugin, pointer);
     let command = o["command"].as_str().expect("checked");
     let command_target = target(pointer, "command");
     if command.is_empty()
@@ -413,7 +447,7 @@ fn stdio(
             CoverageStatus::Fail,
             "COMMAND_RELATIVE_FORM",
         );
-        return skip(
+        skip(
             plugin,
             RuleId::McpCommand,
             name,
@@ -421,6 +455,8 @@ fn stdio(
             "MCP_COMMAND_PATH",
             "command must not be an absolute path or a parent-directory path",
         );
+        block_stdio_remainder(plugin, pointer, "MCP_COMMAND_PATH");
+        return;
     }
     if command.starts_with("./") {
         coverage_id(
@@ -439,9 +475,21 @@ fn stdio(
             pointer,
             "command",
         ) {
-            PathCheck::Outside => return,
-            PathCheck::Io => return,
-            PathCheck::Unresolved => {}
+            PathCheck::Outside => {
+                block_stdio_remainder(plugin, pointer, "SERVER_OUTSIDE_ROOT");
+                return;
+            }
+            PathCheck::Io => {
+                block_stdio_remainder(plugin, pointer, "PATH_IO_UNRESOLVED");
+                return;
+            }
+            PathCheck::Unresolved => record_absent(
+                plugin,
+                RuleId::McpCommand.as_str(),
+                &command_target,
+                CoverageStatus::Unchecked,
+                "PATH_UNRESOLVED",
+            ),
             PathCheck::Inside => coverage(
                 plugin,
                 RuleId::McpCommand,
@@ -486,6 +534,7 @@ fn stdio(
     if let Some(env) = o.get("env").and_then(Value::as_object)
         && !env_checks(plugin, name, pointer, env)
     {
+        block_cwd(plugin, pointer, CoverageStatus::Blocked, "RESERVED_ENV");
         return;
     }
     if o.get("env").is_none() {
@@ -546,9 +595,18 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
         CoverageStatus::Pass,
         "REMOTE_VARIANT_VALID",
     );
+    record_remote_stdio_absence(plugin, pointer);
     let url = o["url"].as_str().expect("checked");
     match valid_url(url) {
         UrlCheck::Invalid => {
+            record_absent(
+                plugin,
+                RuleId::McpHttps.as_str(),
+                &target(pointer, "url"),
+                CoverageStatus::Blocked,
+                "MCP_URL",
+            );
+            block_headers(plugin, pointer, "MCP_URL");
             return skip(
                 plugin,
                 RuleId::McpUrl,
@@ -575,6 +633,14 @@ fn remote(plugin: &mut PluginReport, name: &str, pointer: &str, o: &Map<String, 
             );
         }
         UrlCheck::HttpsRequired => {
+            coverage(
+                plugin,
+                RuleId::McpUrl,
+                &target(pointer, "url"),
+                CoverageStatus::Pass,
+                "URL_VALID",
+            );
+            block_headers(plugin, pointer, "MCP_HTTPS");
             return skip(
                 plugin,
                 RuleId::McpHttps,
@@ -750,6 +816,7 @@ fn cwd_check(
             "CWD_FORM",
             "cwd must be ./, ${PLUGIN_ROOT}, or ${PLUGIN_DATA}",
         );
+        block_cwd(plugin, pointer, CoverageStatus::Blocked, "CWD_FORM");
         return;
     }
     coverage_id(
@@ -790,6 +857,13 @@ fn cwd_check(
             CoverageStatus::Unchecked,
             "ROOT_PATH_ENCODING",
         );
+        record_absent(
+            plugin,
+            RuleId::McpCwdForm.as_str(),
+            &target(pointer, "cwd"),
+            CoverageStatus::Unchecked,
+            "ROOT_PATH_ENCODING",
+        );
         return;
     };
     let expanded = expansion::once(cwd, root_text, "${PLUGIN_DATA}");
@@ -800,8 +874,36 @@ fn cwd_check(
     };
     match inside(root, path, plugin, errors, name, pointer, "cwd") {
         PathCheck::Inside => {}
-        PathCheck::Unresolved => return,
-        PathCheck::Outside | PathCheck::Io => return,
+        PathCheck::Unresolved => {
+            record_absent(
+                plugin,
+                RuleId::McpCwdForm.as_str(),
+                &target(pointer, "cwd"),
+                CoverageStatus::Unchecked,
+                "PATH_UNRESOLVED",
+            );
+            return;
+        }
+        PathCheck::Outside => {
+            record_absent(
+                plugin,
+                RuleId::McpCwdForm.as_str(),
+                &target(pointer, "cwd"),
+                CoverageStatus::Blocked,
+                "SERVER_OUTSIDE_ROOT",
+            );
+            return;
+        }
+        PathCheck::Io => {
+            record_absent(
+                plugin,
+                RuleId::McpCwdForm.as_str(),
+                &target(pointer, "cwd"),
+                CoverageStatus::Unchecked,
+                "PATH_IO_UNRESOLVED",
+            );
+            return;
+        }
     }
     coverage(
         plugin,
@@ -1021,6 +1123,123 @@ fn possible_secret(key: &str, value: &str) -> bool {
 }
 fn escape(x: &str) -> String {
     x.replace('~', "~0").replace('/', "~1")
+}
+
+fn record_absent(
+    plugin: &mut PluginReport,
+    rule_id: &str,
+    target: &str,
+    status: CoverageStatus,
+    reason: &str,
+) {
+    if plugin
+        .coverage
+        .iter()
+        .any(|coverage| coverage.rule_id == rule_id && coverage.target == target)
+    {
+        return;
+    }
+    plugin.coverage.push(Coverage {
+        rule_id: rule_id.into(),
+        target: target.into(),
+        status,
+        reason_code: Some(reason.into()),
+    });
+}
+
+fn record_stdio_remote_absence(plugin: &mut PluginReport, pointer: &str) {
+    for rule in [RuleId::McpUrl, RuleId::McpHttps, RuleId::McpHeaders] {
+        record_absent(
+            plugin,
+            rule.as_str(),
+            &target(
+                pointer,
+                if rule == RuleId::McpHeaders {
+                    "headers"
+                } else {
+                    "url"
+                },
+            ),
+            CoverageStatus::NotApplicable,
+            "STDIO_NO_REMOTE",
+        );
+    }
+}
+
+fn record_remote_stdio_absence(plugin: &mut PluginReport, pointer: &str) {
+    for (rule_id, field) in [
+        (RuleId::McpCommand.as_str(), "command"),
+        (RuleId::PathServerEscape.as_str(), "command"),
+        ("AP-PATH-RELATIVE-FORM", "command"),
+        (RuleId::McpReservedEnv.as_str(), "env"),
+    ] {
+        record_absent(
+            plugin,
+            rule_id,
+            &target(pointer, field),
+            CoverageStatus::NotApplicable,
+            "REMOTE_NO_STDIO",
+        );
+    }
+    block_cwd(
+        plugin,
+        pointer,
+        CoverageStatus::NotApplicable,
+        "REMOTE_NO_STDIO",
+    );
+}
+
+fn block_stdio_remainder(plugin: &mut PluginReport, pointer: &str, reason: &str) {
+    record_absent(
+        plugin,
+        RuleId::McpCommand.as_str(),
+        &target(pointer, "command"),
+        CoverageStatus::Blocked,
+        reason,
+    );
+    record_absent(
+        plugin,
+        RuleId::PathServerEscape.as_str(),
+        &target(pointer, "command"),
+        CoverageStatus::Blocked,
+        reason,
+    );
+    record_absent(
+        plugin,
+        "AP-PATH-RELATIVE-FORM",
+        &target(pointer, "command"),
+        CoverageStatus::Blocked,
+        reason,
+    );
+    record_absent(
+        plugin,
+        RuleId::McpReservedEnv.as_str(),
+        &target(pointer, "env"),
+        CoverageStatus::Blocked,
+        reason,
+    );
+    block_cwd(plugin, pointer, CoverageStatus::Blocked, reason);
+}
+
+fn block_cwd(plugin: &mut PluginReport, pointer: &str, status: CoverageStatus, reason: &str) {
+    let cwd_target = target(pointer, "cwd");
+    for rule_id in [
+        RuleId::McpCwdForm.as_str(),
+        RuleId::PathServerEscape.as_str(),
+        "AP-PATH-RELATIVE-FORM",
+    ] {
+        record_absent(plugin, rule_id, &cwd_target, status, reason);
+    }
+}
+
+fn block_headers(plugin: &mut PluginReport, pointer: &str, reason: &str) {
+    record_absent(
+        plugin,
+        RuleId::McpHeaders.as_str(),
+        &target(pointer, "headers"),
+        CoverageStatus::Blocked,
+        reason,
+    );
 }
 fn coverage(
     plugin: &mut PluginReport,

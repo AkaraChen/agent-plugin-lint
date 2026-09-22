@@ -293,6 +293,53 @@ fn exact_skill_md_name_is_required() {
     );
 }
 
+#[cfg(unix)]
+#[test]
+fn unresolved_skill_directory_is_advisory_not_a_silent_pass() {
+    use std::os::unix::fs::symlink;
+    let t = TempDir::new().unwrap();
+    let root = t.path().join("p");
+    fs::create_dir(&root).unwrap();
+    manifest(&root);
+    skill(&root.join("skills/s"), "s");
+    symlink("missing-target", root.join("skills/ghost")).unwrap();
+    symlink("loop", root.join("skills/loop")).unwrap();
+
+    let report = lint_path(&root, options());
+    assert_eq!(report.exit_code, 0, "{report:?}");
+    let unresolved: Vec<_> = report.plugins[0]
+        .findings
+        .iter()
+        .filter(|finding| {
+            finding.rule_id.as_str() == "AP-ADVICE-UNRESOLVED-PATH"
+                && finding.evidence_code == "SKILL_DIR_UNRESOLVED"
+        })
+        .map(|finding| finding.path.as_str())
+        .collect();
+    assert!(unresolved.contains(&"skills/ghost"), "{unresolved:?}");
+    assert!(unresolved.contains(&"skills/loop"), "{unresolved:?}");
+    assert!(
+        report.plugins[0]
+            .findings
+            .iter()
+            .all(|finding| finding.rule_id.as_str() != "AP-PATH-SKILL-ESCAPE")
+    );
+    assert!(report.plugins[0].coverage.iter().any(|coverage| {
+        coverage.rule_id == "AS-NAME"
+            && coverage.target == "skills/s/SKILL.md"
+            && coverage.status == agent_plugin_lint::CoverageStatus::Pass
+    }));
+
+    let strict = lint_path(
+        &root,
+        LintOptions {
+            mode: InputMode::Plugin,
+            strict: true,
+        },
+    );
+    assert_eq!(strict.exit_code, 1);
+}
+
 /// Reproducible real-corpus entry: `AP_LINT_CORPUS=/path/to/plugins cargo test -p agent-plugin-lint --test s3 corpus -- --ignored`.
 #[ignore = "requires AP_LINT_CORPUS pointing at the pinned real corpus"]
 #[test]

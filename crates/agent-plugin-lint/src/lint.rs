@@ -966,7 +966,17 @@ fn scan_skills(root: &Path, plugin: &mut PluginReport, errors: &mut Vec<ToolErro
                 }
                 continue;
             }
-            Ok(crate::containment::Resolution::Unresolved) => continue,
+            Ok(crate::containment::Resolution::Unresolved) => {
+                add_finding(
+                    plugin,
+                    RuleId::AdviceUnresolvedPath,
+                    logical.clone(),
+                    Scope::Path(logical),
+                    "SKILL_DIR_UNRESOLVED",
+                    "skill directory cannot be resolved; this path was not checked",
+                );
+                continue;
+            }
             Err(_) => {
                 error(
                     errors,
